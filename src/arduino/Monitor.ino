@@ -4,6 +4,7 @@
 #include "Protocol.h"
 #include "ev1527_protocol.h"
 #include "hcs200_protocol.h"
+#include "somfy_protocol.h"
 //------------------------------------------------------------------------------------------------------------------
 #include "CmdHandler.h"
 #include "radio_profile.h"
@@ -18,7 +19,8 @@ CC1101* getRadio(void);
 //------------------------------------------------------------------------------------------------------------------
 EV1527Protocol ev1527;
 HCS200Protocol hcs200;
-Protocol* protocols[] = { &ev1527, &hcs200 };
+SomfyRTSProtocol somfy;
+Protocol* protocols[] = { &ev1527, &hcs200, &somfy };
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t monitor_handler = { &monitor_main, NULL, NULL, "monitor", "Monitoring protocol utility, use: 'monitor help'", 0, "", "monitor help" };
 //------------------------------------------------------------------------------------------------------------------
