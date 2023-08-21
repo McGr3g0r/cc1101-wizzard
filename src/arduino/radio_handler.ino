@@ -490,7 +490,7 @@ CmdStatus_e radio_scan(void* parent,int argc, char* argv[])
    int mfreq;
    int rssi;
    int freq = fstart;
-   long cfreq;
+   long cfreq = fstart;
 
    getRadio()->setRxBw(58);
    getRadio()->setRX();
