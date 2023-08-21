@@ -6,6 +6,19 @@ int Protocol::pulseLen(int microseconds)
     return (microseconds+(pulse_divisor/2))/pulse_divisor;
 }
 //------------------------------------------------------------------------------------------------------------------
+void Protocol::bytesAdd(uint8_t b)
+{
+     if (bytes_idx < sizeof(bytes))
+         bytes[bytes_idx++] = b;
+     
+}
+//------------------------------------------------------------------------------------------------------------------
+void Protocol::bytesClear(void)
+{
+   memset(bytes, 0, sizeof(bytes));
+   bytes_idx = 0;
+}
+//------------------------------------------------------------------------------------------------------------------
 int Protocol::pulses_histogram(int defVal, uint16_t* pulses, int size, int* hist, int* hist_val_idx, int hist_size)
 {
     int res = defVal;
