@@ -22,6 +22,10 @@ HCS200Protocol hcs200;
 SomfyRTSProtocol somfy;
 Protocol* protocols[] = { &ev1527, &hcs200, &somfy };
 //------------------------------------------------------------------------------------------------------------------
+#define CTRL_C 0x03
+#define CTRL_F 0x06
+#define CTRL_D 0x04
+//------------------------------------------------------------------------------------------------------------------
 cmd_handler_t monitor_handler = { &monitor_main, NULL, NULL, "monitor", "Monitoring protocol utility, use: 'monitor help'", 0, "", "monitor help" };
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t monitor_sub_cmd[] = {
@@ -125,13 +129,14 @@ CmdStatus_e monitor_start(void* parent,int argc, char* argv[])
 
     STDOUT.print("monitor freq: ");
     STDOUT.print(getRadio()->getFreq());
-    STDOUT.println(" Khz, press ctrl-c...");
+    STDOUT.println(" Khz, press ctrl-c/f/d to terminate...");
     while(cont)
     { 
       if (STDIN.available() > 0)
       {
          byte c = STDIN.read();
-         if (c == 0x03 /*ctrl-c*/)
+         
+         if (c == CTRL_C || c == CTRL_F || c == CTRL_D)
          {
              cont = false;
              continue;
