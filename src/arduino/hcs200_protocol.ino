@@ -10,8 +10,11 @@
 |  64   | Battery Low
 |  65   | RPT bit, Fixed 1 ??? 
 */
+//------------------------------------------------------------------------------------------------------------------
 #define HCS_GUARD_TIME_US 15600
-
+#define HCS_PROTO_PULSES 155
+#define HCS_PROTO_BITS 66
+//------------------------------------------------------------------------------------------------------------------
 HCS200Protocol::HCS200Protocol()
 {
   pulse_divisor = HCS200_PULSLSE_DIVISOR;
@@ -44,9 +47,8 @@ int HCS200Protocol::getFrameTime()
 //------------------------------------------------------------------------------------------------------------------
 int HCS200Protocol::getMinPulses(void)
 {
-    return 155;
+    return HCS_PROTO_PULSES;
 }
-
 //------------------------------------------------------------------------------------------------------------------
 bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
 {
@@ -55,7 +57,7 @@ bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
         int preambule = 0;
         int pre_error = 0;
 
-        if (pulses < 155)
+        if (pulses < HCS_PROTO_PULSES)
            return false;
 
         for (i=0; i< pulses; i++)
@@ -88,6 +90,8 @@ bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
         length = 0;
         bits = 0;
         bool buffer_fix = false;
+
+        bytesClear();
         
         for (; i< pulses-1; i+=2)
         {
@@ -115,7 +119,7 @@ bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
            {
               // swap nibbles
               bits = reverse8(bits);
-              bytes[bytes_idx++] = bits;
+              bytesAdd(bits);
               bits = 0;
            }
            
@@ -125,7 +129,7 @@ bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
               buffer_fix = true;
            }    
 
-           if (length == 66)
+           if (length == HCS_PROTO_BITS)
                break;
         }
         
@@ -154,14 +158,14 @@ bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
            {
               // swap nibbles
               bits = reverse8(bits);
-              bytes[bytes_idx++] = bits;
+              bytesAdd(bits);
               bits = 0;
            }
            
         }
        
         //emulate last bit if not received 66 pulses
-        if (length == 65)
+        if (length == (HCS_PROTO_BITS -1))
         {
              bits <<= 0;
              length++;
@@ -170,9 +174,9 @@ bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
         if ((length & 7) != 0)
         {
               bits = reverse8(bits);
-              bytes[bytes_idx++] = bits;
+              bytesAdd(bits);
         }
-        if (length < 66)
+        if (length < HCS_PROTO_BITS)
            return false;
         else
            return true; 

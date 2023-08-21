@@ -2,6 +2,7 @@
 #include "ev1527_protocol.h"
 //------------------------------------------------------------------------------------------------------------------
 #define EV1527_TIME_US 250
+#define EV1527_PROTO_BITS 24
 //------------------------------------------------------------------------------------------------------------------
 String EV1527Protocol::getName(void)
 {
@@ -69,7 +70,8 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
     length = 0;
     bits = 0;
     bool buffer_fix = false;
-    bytes_idx = 0;
+
+    bytesClear();
     
     for (; i<pulses-1; i+=2)
     {
@@ -94,7 +96,7 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
 
        if ((length & 7) == 0)
        {
-          bytes[bytes_idx++] = bits;
+          bytesAdd(bits);
           bits = 0;
        }
        
@@ -104,7 +106,7 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
           buffer_fix = true;
        }    
       
-       if (length == 24)
+       if (length == EV1527_PROTO_BITS)
            break; 
     }
         
@@ -131,21 +133,18 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
 
        if ((length & 7) == 0)
        {
-          bytes[bytes_idx++] = bits;
+          bytesAdd(bits);
           bits = 0;
        }
     }
-
     
     if ((length & 7) != 0)
     {
-          bytes[bytes_idx++] = bits;
+        bytesAdd(bits);
     }
            
-    if (length < 24)
-    {
+    if (length < EV1527_PROTO_BITS)
        return false;
-    }
     else
        return true;
 }
