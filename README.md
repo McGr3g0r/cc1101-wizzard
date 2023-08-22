@@ -1,7 +1,7 @@
 # cc1101-wizzard
 CC1101 serial console tool
 
-This is my reimplementation of cc1101-tool.
+This is my reimplementation of cc1101-tool, and it is a work in progress.
 It has handlers for commands that can be registered in the code dynamically.
 
 Currently working on monitor mode - monitoring for registered radio protocols (like EV1527, HCS200, Somfy RTS Keytis)
@@ -28,7 +28,8 @@ monitor freq: 433920 Khz, press ctrl-c...
 
 Supported commands:
 
-radio:
+radio
+```
 - sfreq : set frequency, use Khz, for example 433920'
 - smod : set modulation, 0 to 4 or 2fsk, gfsk, ook, 4fsk, msk
 - sdev : set freqency deviation in Hz. Value from 158 to 380850. Default is 47600 Hz.
@@ -70,13 +71,16 @@ radio:
 - pula : add pulses <pulses> ..
 - puao : add pulses <offset> <pulses> ...
 - jam : jam current channel <time millis> 0 - until ctrl-c
+```
 
 monitor
+```
 Monitoring protocol utility, use: 'monitor help'
 - start : starts monitoring, stops with ctrl-c
 - prot : list registered protocols
-
+```
 opensesame
+```
 - prot : list registered protocols
 - somfy : somfy iterated frames flood
-
+```
