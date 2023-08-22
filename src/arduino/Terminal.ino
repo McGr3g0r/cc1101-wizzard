@@ -22,11 +22,12 @@ void Terminal::input(Stream& term)
             avail = false;
             if (buffer.length()) {
                  if(buffer.length() > 1)
-                    buffer = buffer.substring(buffer.length()-1);
+                    buffer = buffer.substring(0, buffer.length()-1);
                  else
                     buffer = "";
                     
                 if (echoEnabled) term.write("\b \b");
+
             }
         }
         else if (data == '\r' || data == '\n' ) {
