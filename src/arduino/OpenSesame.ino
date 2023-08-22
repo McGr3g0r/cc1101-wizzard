@@ -12,7 +12,6 @@
 #include "utils.h"
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_main(void* parent,int argc, char* argv[]);
-CmdStatus_e open_sesame_protocols(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_help(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setcode(void* parent,int argc, char* argv[]);
@@ -43,7 +42,6 @@ cmd_handler_t open_sesame_handler = { &open_sesame_main, NULL, NULL, "opensesame
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t open_sesame_sub_cmd[] = {
    { &open_sesame_main,      &open_sesame_handler,   NULL, "help",  "this help", 0, "", "opensesame help"},
-   { &open_sesame_protocols, &open_sesame_handler,   NULL, "prot",  "list registered protocols", 0, "", "opensesame prot"},
    { &open_sesame_somfy,     &open_sesame_handler,   NULL, "somfy",  "somfy iterated frames flood", 0, "", "opensesame somfy help"},
    { 0,  0, NULL, "",  "", 0, "","" }
 };
@@ -131,24 +129,6 @@ CmdStatus_e open_sesame_somfy_help(void* parent,int argc, char* argv[])
      }
     
      return OK;
-}
-//------------------------------------------------------------------------------------------------------------------
-CmdStatus_e open_sesame_protocols(void* parent,int argc, char* argv[])
-{
-    int maxLen = sizeof(osprots) / sizeof(Protocol*);
-    
-    STDOUT.println("protocols: ");
-    
-    for (int idx = 0 ; idx < maxLen; idx++)
-    {
-        STDOUT.print(osprots[idx]->getName());
-        if (idx < maxLen - 1)
-            STDOUT.print(",");
-              
-    }
-    STDOUT.print("\n\r");
- 
-  return OK;
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_setcode(void* parent,int argc, char* argv[])

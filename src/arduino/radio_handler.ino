@@ -616,7 +616,7 @@ CmdStatus_e radio_pulses_show(void* parent,int argc, char* argv[])
         STDOUT.print(pulses[idx]);
         if (idx < radio_pulses_get_count() - 1)
             STDOUT.print(",");
-        if (idx > 0 && ((idx % 32) == 0))
+        if (idx > 0 && ((idx % 16) == 0))
             STDOUT.print("\n\r");
     }
     STDOUT.print("\n\r");

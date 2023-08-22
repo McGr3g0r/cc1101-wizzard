@@ -20,6 +20,7 @@ void radio_cmd_init(void);
 void help_cmd_init(void);
 void monitor_cmd_init(void);
 void opensesame_cmd_init(void);
+void protocols_cmd_init(void);
 //------------------------------------------------------------------------------------------------------------------
 CmdHandler* getRootCommandHandler(void)
 {
@@ -32,6 +33,7 @@ void commands_init(void)
   radio_cmd_init();
   monitor_cmd_init();
   opensesame_cmd_init();
+  protocols_cmd_init();
 }
 //------------------------------------------------------------------------------------------------------------------
 CC1101* getRadio() 

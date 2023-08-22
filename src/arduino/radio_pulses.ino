@@ -84,16 +84,21 @@ int radio_pulses_grab(Stream& input, int startOffset, int minPulseUs, int maxSpa
 int radio_pulses_send(int startOffset, int pulses)
 {
     int total_us = 0; 
+    uint32_t s;
     if (pulses > 0 && startOffset >=0 && startOffset < radio_pulses_buffer_len)
     { 
-        CC1101* radio = getRadio();
-    
+        CC1101* radio = getRadio();        
         radio->setCCMode(0); 
         radio->setPacketFormat(3);
         radio->setTX();
-            
+
         pinMode(gdo0, OUTPUT);
-    
+        if (radio_pulses_buffer[startOffset] == 0xffff) /*hack*/
+        {
+            digitalWrite(gdo0, LOW);
+            delayMicroseconds(1000);
+        }
+        
         digitalWrite(RXLED, LOW);   // set the RX LED ON
         uint8_t curr_val = 1;
         for (int idx = startOffset; idx < startOffset + pulses; idx++) {
@@ -101,7 +106,9 @@ int radio_pulses_send(int startOffset, int pulses)
                break;
            
             digitalWrite(gdo0, curr_val);
-            delayMicroseconds(radio_pulses_buffer[idx]);
+            s = micros();
+            while (micros() -s < radio_pulses_buffer[idx]);
+            //delayMicroseconds(radio_pulses_buffer[idx]);
             curr_val++;
             curr_val &= 0x01;              
         }
@@ -109,16 +116,18 @@ int radio_pulses_send(int startOffset, int pulses)
         digitalWrite(gdo0, 0);
         digitalWrite(RXLED, HIGH);   // set the RX LED OFF
 
+        // setting normal pkt format again
+        radio->setCCMode(1); 
+        radio->setPacketFormat(0);
+        radio->setRX();
+
         for (int idx = startOffset; idx < startOffset + pulses; idx++) {
            if (idx >= radio_pulses_buffer_len)
                break;
                
             total_us += radio_pulses_buffer[idx];
         }
-        // setting normal pkt format again
-        radio->setCCMode(1); 
-        radio->setPacketFormat(0);
-        radio->setRX();
+        radio_pulses_cnt = startOffset + pulses;
     }
 
     return total_us;

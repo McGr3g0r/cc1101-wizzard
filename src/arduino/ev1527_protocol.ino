@@ -6,6 +6,11 @@
 #define EV1527_PULSES_PER_BIT 4
 #define EV1527_GUARD_TIME_US 150
 //------------------------------------------------------------------------------------------------------------------
+EV1527Protocol::EV1527Protocol()
+{
+    pulse_divisor = EV1527_TIME_US;
+}
+//------------------------------------------------------------------------------------------------------------------
 String EV1527Protocol::getName(void)
 {
     return "ev1527";  
@@ -38,8 +43,6 @@ int EV1527Protocol::getMinPulses(void)
 //------------------------------------------------------------------------------------------------------------------
 bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
 {
-    pulse_divisor = EV1527_TIME_US;  
-
     int i;
     int length;
     bool preambule = false;
@@ -151,6 +154,12 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
        return true;
 }
 //------------------------------------------------------------------------------------------------------------------
+void EV1527Protocol::setData(uint32_t data, uint8_t btn)
+{
+    code = data;
+    this->btn = btn;  
+}
+//------------------------------------------------------------------------------------------------------------------
 int EV1527Protocol::dataToBytes(void)
 {
 
@@ -162,7 +171,7 @@ int EV1527Protocol::dataToBytes(void)
     bytesAdd(reverse8((code & 0xf0) | (btn & 0x0f)));
 
     //24bits in protocol
-    return bytes_idx;
+    return EV1527_PROTO_BITS;
 }
 //------------------------------------------------------------------------------------------------------------------
 bool EV1527Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo)
