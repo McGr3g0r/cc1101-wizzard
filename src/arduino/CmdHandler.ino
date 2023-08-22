@@ -65,26 +65,47 @@ CmdStatus_e CmdHandler::handleSubCommand(cmd_handler_t* subCmd, int argc, char* 
    {
        int idx = 0;
        cmd_handler_t* sub_cmd = &subCmd->sub_cmd[idx];
+       cmd_handler_t* sub_sub_cmd;
+
+       int argcoff = 2;
+       
        while (sub_cmd && sub_cmd->handler != NULL)
        {
           if (sub_cmd->cmd == String(argv[1]))
           {
-              if (argc -2 < sub_cmd->min_arg_count)
+
+              if (argc >= 3)
+              {
+                  int idx2 = 0;
+                  sub_sub_cmd = &sub_cmd->sub_cmd[idx2];
+                  while (sub_sub_cmd && sub_sub_cmd->handler != NULL)
+                  {
+                        if (sub_sub_cmd->cmd == String(argv[2]))
+                        {
+                            argcoff = 3;
+                            sub_cmd = sub_sub_cmd;
+                            break;
+                        }
+                    
+                        idx2++;
+                        sub_sub_cmd = &sub_cmd->sub_cmd[idx2];   
+                  }
+              }
+            
+              if (argc - argcoff < sub_cmd->min_arg_count)
               {
                   setHint(sub_cmd->hint);
                   return NOT_ENOUGH_PARAMS;   
               }
-              
-              if (argc > 2)
-              for (int currArg = 2; currArg < argc; currArg++)
+              if (argc > argcoff)
+              for (int currArg = argcoff; currArg < argc; currArg++)
               {
-                  if (sub_cmd->validation.length()>= currArg-1 && !validateArgumentType(argv[currArg], sub_cmd->validation[currArg-2]))
+                  if (sub_cmd->validation.length()>= currArg-1 && !validateArgumentType(argv[currArg], sub_cmd->validation[currArg-argcoff]))
                   {
                         setHint(sub_cmd->hint);
                         return WRONG_PARAMS;
                   }
               }
-
               return sub_cmd->handler(this, argc, argv);
           }
           idx++;

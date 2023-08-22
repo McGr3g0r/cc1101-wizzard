@@ -108,7 +108,8 @@ void monitor_process(int minPulseTime, int maxObsTime)
              if (protocols[idx]->fromPulses(pulses, radio_pulses_get_pulses()))
              {
                  String s = protocols[idx]->describe(millis());
-                 STDOUT.println(s);
+                 STDOUT.print(s);
+                 STDOUT.print("\n\r");
              }
          }
      }
