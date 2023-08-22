@@ -92,6 +92,8 @@ class CC1101 {
 
         void setCCMode(int mode);
         int getCCMode(void);
+
+        void sendData(uint8_t* data, int len);
         
     private:
         void default_init(void);

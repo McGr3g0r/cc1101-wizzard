@@ -38,6 +38,9 @@ CmdStatus_e radio_pulses_flush(void* parent,int argc, char* argv[]);
 CmdStatus_e radio_pulses_grab(void* parent,int argc, char* argv[]);
 CmdStatus_e radio_pulses_show(void* parent,int argc, char* argv[]);
 CmdStatus_e radio_pulses_play(void* parent,int argc, char* argv[]);
+CmdStatus_e radio_pulses_set(void* parent,int argc, char* argv[]);
+CmdStatus_e radio_pulses_add(void* parent,int argc, char* argv[]);
+CmdStatus_e radio_jammer(void* parent,int argc, char* argv[]);
 //------------------------------------------------------------------------------------------------------------------
 CmdHandler* getRootCommandHandler(void);
 CC1101* getRadio(void);
@@ -86,7 +89,10 @@ cmd_handler_t radio_sub_cmd[] = {
    { &radio_pulses_flush,   &radio_handler,  NULL, "pulf", "flush puses buffer" , 0, "","radio pulf" },
    { &radio_pulses_show ,   &radio_handler,  NULL, "puls", "show puses buffer" , 0, "","radio puls" },
    { &radio_pulses_grab,    &radio_handler,  NULL, "pulg", "grab pulses <offset><min_time_us><max_space_time_us>" , 3, "iii","radio pulg 0<int buffer offset> 200<int microseconds> 1500<int microseconds>" },  
-   { &radio_pulses_play,    &radio_handler,  NULL, "pulp", "play pulses <offset><pulses>" , 2, "ii","radio pulp 0<int> 2000<int>" },  
+   { &radio_pulses_play,    &radio_handler,  NULL, "pulp", "play pulses <offset><pulses>" , 2, "ii","radio pulp 0<int> 2000<int>" },
+   { &radio_pulses_add,     &radio_handler,  NULL, "pula", "add pulses <pulses> .." , 1, "i","radio pula 0<int> 20<int> ..." },
+   { &radio_pulses_addoff,  &radio_handler,  NULL, "puao", "add pulses <offset> <pulses> ..." , 2, "ii","radio puao 0<int> 20<int> ..." },
+   { &radio_jammer,         &radio_handler,  NULL, "jam",  "jam current channel <time millis> 0 - until ctrl-c" , 1, "i","radio jam 0<int>" },
 
       
    { 0,  0, NULL, "",  "", 0, "","" }
@@ -608,7 +614,7 @@ CmdStatus_e radio_pulses_show(void* parent,int argc, char* argv[])
     for (int idx = 0; idx < radio_pulses_get_count(); idx++)
     {
         STDOUT.print(pulses[idx]);
-        if (idx > 0 && idx < radio_pulses_get_count() - 1)
+        if (idx < radio_pulses_get_count() - 1)
             STDOUT.print(",");
         if (idx > 0 && ((idx % 32) == 0))
             STDOUT.print("\n\r");
@@ -662,6 +668,113 @@ CmdStatus_e radio_pulses_play(void* parent,int argc, char* argv[])
    int periodUs = radio_pulses_send(offs, total);
    STDOUT.print("pulses sent:");STDOUT.print(periodUs);STDOUT.print(" uS.\n\r");
    
+       
+   return CmdStatus_e::OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e radio_pulses_addoff(void* parent,int argc, char* argv[])
+{
+   int offs;
+  
+   offs = atoi(argv[2]);
+   
+   if (offs < 0 || (offs + argc -3) >= radio_pulses_max_count())
+       return CmdStatus_e::WRONG_PARAMS;    
+
+   if (argc < 3)
+       return CmdStatus_e::WRONG_PARAMS;          
+   
+   for (int pos = 3; pos < argc; pos++)
+   {
+       if (isNumeric(argv[pos]))
+       {
+           uint16_t pulse = strtoul(argv[pos], 0, 10);
+          if (pulse < 1)
+              return CmdStatus_e::WRONG_PARAMS;
+          else
+          {
+            radio_pulses_set(offs++, pulse);    
+          }
+       }
+       else
+           return CmdStatus_e::WRONG_PARAMS;
+   }
+       
+   return CmdStatus_e::OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e radio_pulses_add(void* parent,int argc, char* argv[])
+{
+   if (argc < 2)
+       return CmdStatus_e::WRONG_PARAMS;          
+   
+   for (int pos = 2; pos < argc; pos++)
+   {
+       if (isNumeric(argv[pos]))
+       {
+          uint16_t pulse = strtoul(argv[pos], 0, 10);
+          if (pulse < 1)
+              return CmdStatus_e::WRONG_PARAMS;
+          else
+          {
+            radio_pulses_add(pulse);    
+          }
+       }
+       else
+           return CmdStatus_e::WRONG_PARAMS;
+   }
+       
+   return CmdStatus_e::OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e radio_jammer(void* parent,int argc, char* argv[])
+{
+   int timems;
+   boolean done = false;
+  
+   timems = atoi(argv[2]);
+   
+   if (timems < 0)
+       return CmdStatus_e::WRONG_PARAMS;    
+
+    STDOUT.print("jamming ...");
+    if (timems)
+    {
+      STDOUT.print(" for ");
+      STDOUT.print(timems);
+      STDOUT.print(" ms");
+      STDOUT.print("\n\r");
+    }
+    else
+        STDOUT.println(" press ctrl-c/f/d to terminate...");
+
+   uint32_t s = millis();
+   while (!done)
+   {
+        randomSeed(analogRead(0));
+        for (int i = 0; i< CC_PACKET_BUFFER_LEN; i++)
+        { 
+            radio_buffer_get(0)[i] = (byte)random(255);
+        };                
+        digitalWrite(RXLED, ~digitalRead(RXLED));
+        getRadio()->sendData(radio_buffer_get(0), CC_PACKET_BUFFER_LEN - 4);
+        if (timems)
+            done = millis() -s >= timems;
+        else {
+            if (STDIN.available() > 0)
+            {
+               byte c = STDIN.read();
+               
+               if (c == CTRL_C || c == CTRL_F || c == CTRL_D)
+               {
+                   done = true;
+                   continue;
+               }
+            }          
+        }        
+   }
+   digitalWrite(RXLED, LOW);
+
        
    return CmdStatus_e::OK;
 }

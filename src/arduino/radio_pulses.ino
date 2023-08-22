@@ -1,15 +1,19 @@
 //------------------------------------------------------------------------------------------------------------------
 #include "radio_pulses.h"
+#include "radio_buffer.h"
 #include "settings.h"
 #include "cc1101.h"
 //------------------------------------------------------------------------------------------------------------------
 CC1101* getRadio(void);
 //------------------------------------------------------------------------------------------------------------------
 int radio_pulses_cnt;
-uint16_t radio_pulses_buffer[RADIO_PULSES_BUFFER_LEN];
+uint16_t* radio_pulses_buffer;
+int radio_pulses_buffer_len;
 //------------------------------------------------------------------------------------------------------------------
 void radio_pulses_init(void)
 {
+  radio_pulses_buffer = (uint16_t*)radio_buffer_get(0);
+  radio_pulses_buffer_len = radio_buffer_size(0) / 2; /*buffer is uint8_t, pulses are uint16_t*/
   radio_pulses_flush();
 }
 //------------------------------------------------------------------------------------------------------------------
@@ -51,7 +55,7 @@ int radio_pulses_grab(Stream& input, int startOffset, int minPulseUs, int maxSpa
        uint8_t curr_val = 1;
 
        s = micros();
-       while ((idx < RADIO_PULSES_BUFFER_LEN) && (micros() -s < maxSpaceUs))
+       while ((idx < radio_pulses_buffer_len) && (micros() -s < maxSpaceUs))
        {
             while((digitalRead(gdo0) == curr_val) && (micros() -s < maxSpaceUs));
             s2 = micros();
@@ -80,7 +84,7 @@ int radio_pulses_grab(Stream& input, int startOffset, int minPulseUs, int maxSpa
 int radio_pulses_send(int startOffset, int pulses)
 {
     int total_us = 0; 
-    if (pulses > 0 && startOffset >=0 && startOffset < RADIO_PULSES_BUFFER_LEN)
+    if (pulses > 0 && startOffset >=0 && startOffset < radio_pulses_buffer_len)
     { 
         CC1101* radio = getRadio();
     
@@ -93,25 +97,20 @@ int radio_pulses_send(int startOffset, int pulses)
         digitalWrite(RXLED, LOW);   // set the RX LED ON
         uint8_t curr_val = 1;
         for (int idx = startOffset; idx < startOffset + pulses; idx++) {
-           if (idx >= RADIO_PULSES_BUFFER_LEN)
+           if (idx >= radio_pulses_buffer_len)
                break;
-
-            
-            uint32_t s = micros();
+           
             digitalWrite(gdo0, curr_val);
-            
             delayMicroseconds(radio_pulses_buffer[idx]);
             curr_val++;
-            curr_val &= 0x01;
-
-               
+            curr_val &= 0x01;              
         }
             
         digitalWrite(gdo0, 0);
         digitalWrite(RXLED, HIGH);   // set the RX LED OFF
 
         for (int idx = startOffset; idx < startOffset + pulses; idx++) {
-           if (idx >= RADIO_PULSES_BUFFER_LEN)
+           if (idx >= radio_pulses_buffer_len)
                break;
                
             total_us += radio_pulses_buffer[idx];
@@ -125,8 +124,31 @@ int radio_pulses_send(int startOffset, int pulses)
     return total_us;
 }
 //------------------------------------------------------------------------------------------------------------------
+int radio_pulses_add(uint16_t pulse)
+{
+    if ( radio_pulses_cnt + 1< radio_pulses_buffer_len)
+    {
+        radio_pulses_buffer[radio_pulses_cnt] = pulse;
+        radio_pulses_cnt++;
+    }
+
+    return radio_pulses_cnt;  
+}
+//------------------------------------------------------------------------------------------------------------------
+int radio_pulses_set(int offset, uint16_t pulse)
+{
+    if (offset < radio_pulses_buffer_len)
+    {
+        radio_pulses_buffer[offset] = pulse;
+        if (offset >= radio_pulses_cnt)
+        radio_pulses_cnt = offset + 1;
+    }
+
+    return radio_pulses_cnt;
+}
+//------------------------------------------------------------------------------------------------------------------
 int  radio_pulses_max_count(void)
 {
-   return RADIO_PULSES_BUFFER_LEN - radio_pulses_cnt;
+   return radio_pulses_buffer_len - radio_pulses_cnt;
 }
 //------------------------------------------------------------------------------------------------------------------

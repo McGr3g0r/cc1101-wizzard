@@ -6,6 +6,11 @@ int Protocol::pulseLen(int microseconds)
     return (microseconds+(pulse_divisor/2))/pulse_divisor;
 }
 //------------------------------------------------------------------------------------------------------------------
+int Protocol::pulseDuration(int ticks)
+{
+    return ticks * pulse_divisor;
+}
+//------------------------------------------------------------------------------------------------------------------
 void Protocol::bytesAdd(uint8_t b)
 {
      if (bytes_idx < sizeof(bytes))

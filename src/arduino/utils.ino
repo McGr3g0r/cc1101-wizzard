@@ -171,3 +171,25 @@ void apply_value_to_bitmask(uint32_t* b0, uint32_t* b1, uint32_t* b2, uint32_t m
     *b0 = uint32_read_buffer(&b[8], 0);
 }
 //------------------------------------------------------------------------------------------------------------------
+String millis_to_time(uint32_t ms)
+{
+    uint32_t rest = ms;
+    char buffer[64];
+    
+    int days = rest / (24 * 3600 * 1000);
+    rest -= days *  (24 * 3600 * 1000);
+
+    int hours = rest / (3600 * 1000);
+    rest -= hours *  (3600 * 1000);
+
+    int mins = rest / (60 * 1000);
+    rest -= mins *  (60 * 1000);
+
+    int secs = rest / (1000);
+    rest -= secs *  (1000);
+    sprintf(buffer, "%02d.%02d:%02d:%02d.%03d", days, hours, mins, secs, rest);
+
+    return String(buffer);
+    
+}
+//------------------------------------------------------------------------------------------------------------------

@@ -17,7 +17,7 @@ Preamble 6 times  2560us HIGH then 2560us LOW
 */
 #define HALF_TIME_CLOCK 640
 #define SOMFY_GUARD_TIME_US 1200
-#define PREAMBLE_PULSES 4
+#define PREAMBLE_PULSE_LEN 4
 #define SOFT_SYNC_PULSES 7.5
 #define SOFT_SYNC_US 4800
 #define SOMFY_CODED_BITS 81
@@ -74,7 +74,7 @@ bool SomfyRTSProtocol::fromPulses(int pulses, uint16_t* buffer)
         for (i=0; i< pulses; i++)
         {
           int t = pulseLen(buffer[i]);
-          if (t >=PREAMBLE_PULSES && t <= PREAMBLE_PULSES+1)
+          if (t >=PREAMBLE_PULSE_LEN && t <= PREAMBLE_PULSE_LEN+1)
           {      
             preambule++;
             if (preambule  == 24 || (preambule == 12 && i > 30 /* repeated frame*/))
@@ -159,8 +159,67 @@ bool SomfyRTSProtocol::fromPulses(int pulses, uint16_t* buffer)
            return true;
 }
 //------------------------------------------------------------------------------------------------------------------
-bool SomfyRTSProtocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses)
+int SomfyRTSProtocol::dataToBytes(void)
 {
+     bytesClear();
+     
+     bytesAdd(reverse8((code0 >> 24) & 0xff));
+     bytesAdd(reverse8((code0 >> 16) & 0xff));
+     bytesAdd(reverse8((code0 >> 8) & 0xff));
+     bytesAdd(reverse8(code0 & 0xff));
+      
+     bytesAdd(reverse8((code1 >> 24) & 0xff));
+     bytesAdd(reverse8((code1 >> 16) & 0xff));
+     bytesAdd(reverse8((code1 >> 8) & 0xff));
+     bytesAdd(reverse8(code1 & 0xff));
+      
+     bytesAdd(reverse8((code2 >> 24) & 0xff));
+     bytesAdd(reverse8((code2 >> 16) & 0xff));
+     bytesAdd(reverse8((code2 >> 8)  & 0x80));
+     
+    return bytes_idx;
+}
+//------------------------------------------------------------------------------------------------------------------
+bool SomfyRTSProtocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses,int frameNo)
+{
+    int pls = 0;
+
+    int length = dataToBytes();
+
+    int preamble_pulses = frameNo == 0 ? 24 : 12;
+  
+    if (maxPulses < (2 * SOMFY_FRAME_PULSES))
+       return false;
+       
+    for (pls = 0; pls < preamble_pulses; pls++)
+        buffer[pls] = pulseDuration(PREAMBLE_PULSE_LEN);
+
+    buffer[pls++] = SOFT_SYNC_US;
+
+    for (int i=0; i< length; i++)
+    {
+         int bit = (bytes[i/8] >> (i&7)) & 1;
+         if (bit)
+         {
+             buffer[pls++] = pulseDuration(1);
+             buffer[pls++] = pulseDuration(1);
+         } else
+         {
+             buffer[pls++] = pulseDuration(2);
+         }
+    }
+          
+    //last pulse not LOW -add frame spacer ???
+    if ((pls + 1)  % 2 == 1)
+    {
+       //last pulse must be zero - add the time guard for frames separation
+       buffer[pls++] = SOMFY_GUARD_TIME_US; //frame repeat pause        
+    } else {
+       buffer[pls - 1] += SOMFY_GUARD_TIME_US;
+    }       
+
+    *pulses = pls;
+    
   return false;
 }
 //------------------------------------------------------------------------------------------------------------------
@@ -178,3 +237,11 @@ String SomfyRTSProtocol::describe(uint32_t ts)
           
       return buffer;
 }
+//------------------------------------------------------------------------------------------------------------------
+void SomfyRTSProtocol::setCodes(uint32_t code0, uint32_t code1, uint32_t code2)
+{
+    this->code0 = code0;
+    this->code1 = code1;
+    this->code2 = code2;
+}
+//------------------------------------------------------------------------------------------------------------------

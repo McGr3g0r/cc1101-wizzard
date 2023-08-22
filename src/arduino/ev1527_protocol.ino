@@ -3,6 +3,8 @@
 //------------------------------------------------------------------------------------------------------------------
 #define EV1527_TIME_US 250
 #define EV1527_PROTO_BITS 24
+#define EV1527_PULSES_PER_BIT 4
+#define EV1527_GUARD_TIME_US 150
 //------------------------------------------------------------------------------------------------------------------
 String EV1527Protocol::getName(void)
 {
@@ -149,9 +151,52 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
        return true;
 }
 //------------------------------------------------------------------------------------------------------------------
-bool EV1527Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses)
+int EV1527Protocol::dataToBytes(void)
 {
-    return false;
+
+    bytesClear();
+
+    //code 20bit, btn  bits
+    bytesAdd(reverse8((code >> 16) & 0xff));
+    bytesAdd(reverse8((code >> 8)  & 0xff));
+    bytesAdd(reverse8((code & 0xf0) | (btn & 0x0f)));
+
+    //24bits in protocol
+    return bytes_idx;
+}
+//------------------------------------------------------------------------------------------------------------------
+bool EV1527Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo)
+{
+    int pls = 0;
+
+    int length = dataToBytes();
+  
+    if (maxPulses < (32 + (24 * EV1527_PULSES_PER_BIT)))
+       return false;
+
+    buffer[pls++] = pulseDuration(1);
+    buffer[pls++] = pulseDuration(31);
+       
+    for (int i=0; i<length; i++)
+    {
+         int bit = (bytes[i/8] >> (i&7)) & 1;
+         if (bit)
+         {
+            buffer[pls++] = pulseDuration(3);
+            buffer[pls++] = pulseDuration(1);
+         } else
+         {
+            buffer[pls++] = pulseDuration(1);
+            buffer[pls++] = pulseDuration(3);
+         }
+    }
+
+    buffer[pls - 1] += EV1527_GUARD_TIME_US;
+
+    *pulses = pls;
+
+  
+    return true;
 }
 //------------------------------------------------------------------------------------------------------------------
 String EV1527Protocol::describe(uint32_t ts)

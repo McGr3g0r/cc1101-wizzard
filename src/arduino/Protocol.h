@@ -7,7 +7,7 @@ class Protocol
     public:
        virtual String getName();
        virtual bool fromPulses(int pulses, uint16_t* buffer);
-       virtual bool toPulses(uint16_t* buffer, int maxPulses,int* pulses);
+       virtual bool toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo);
        
        virtual int getMinimalTime();
        virtual int getMaximalTime();
@@ -15,7 +15,6 @@ class Protocol
        virtual int getFrameTime();
        virtual int getMinPulses(void);
 
-       
        virtual String describe(uint32_t ts);
 
    protected:
@@ -27,11 +26,14 @@ class Protocol
         int bits;
 
         int pulseLen(int microseconds);
+        int pulseDuration(int ticks);
         int pulses_histogram(int defVal, uint16_t* pulses, int size, int* hist, int* hist_val_idx, int hist_size);
         void dump_pulses(int pulses, uint16_t* buffer);
         void dump_pulses_len(int pulses, uint16_t* buffer);
         void bytesAdd(uint8_t b);
         void bytesClear(void);
+
+        virtual int dataToBytes(void);
 };
 //------------------------------------------------------------------------------------------------------------------
 #endif//__PROTOCOL_H__

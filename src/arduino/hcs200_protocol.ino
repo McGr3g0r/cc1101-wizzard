@@ -181,10 +181,71 @@ bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
         else
            return true; 
 }
+
 //------------------------------------------------------------------------------------------------------------------
-bool HCS200Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses)
+int HCS200Protocol::dataToBytes(void)
 {
-  return false;
+    uint8_t button = btn;
+    uint8_t status;
+    uint8_t repeat = rpt;
+    
+    bytesClear();
+  
+    //encrypted LSB
+    bytesAdd(enc & 0xff);
+    bytesAdd((enc >> 8) & 0xff);
+    bytesAdd((enc >> 16) & 0xff);      
+    bytesAdd((enc >> 24) & 0xff);
+    //serial 28bits
+    bytesAdd((serial & 0xff));
+    bytesAdd(((serial >> 8) & 0xff));
+    bytesAdd(((serial >> 16) & 0xff));
+    //serial-msb + btn
+    if (learn)
+        button = 0x0f;    
+        
+    bytesAdd((((serial >> 24) & 0x0f) | ((button & 0x0f) << 4)));
+    status = 0;
+    if (battery_low)
+       status |= 0x01;
+    if (repeat)
+       status |= 0x02;
+    bytesAdd((status & 0xff));
+
+    return HCS_PROTO_BITS;
+}
+//------------------------------------------------------------------------------------------------------------------
+bool HCS200Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo)
+{
+     int length = dataToBytes();
+     int pls = 0;
+
+    const int preambule = 23; // 23 * TE
+
+    for (pls=0; pls <preambule; pls++)
+        buffer[pls] = pulseDuration(1);
+
+    buffer[pls++] = pulseDuration(10);
+
+    for (int i=0; i<length; i++)
+    {
+       int bit = (bytes[i/8] >> (i&7)) & 1;
+       if (bit)
+       {
+           buffer[pls++] = pulseDuration(1);
+           buffer[pls++] = pulseDuration(2);
+       } else
+       {
+           buffer[pls++] = pulseDuration(2);
+           buffer[pls++] = pulseDuration(1);
+       }
+    }
+
+    buffer[pls - 1] += HCS_GUARD_TIME_US;
+
+    *pulses = pls;    
+        
+    return true;
 }
 //------------------------------------------------------------------------------------------------------------------
 String HCS200Protocol::describe(uint32_t ts)

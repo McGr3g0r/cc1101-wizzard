@@ -11,7 +11,7 @@ class HCS200Protocol: public Protocol
        HCS200Protocol();
        String getName();
        bool fromPulses(int pulses, uint16_t* buffer);
-       bool toPulses(uint16_t* buffer, int maxPulses,int* pulses);
+       bool toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo);
        int getMinimalTime();
        int getMaximalTime();
        int getInterFrameTime();
@@ -26,6 +26,8 @@ class HCS200Protocol: public Protocol
         bool     learn;
         bool     battery_low;
         bool     rpt;
+
+        int dataToBytes(void);
 };
 //------------------------------------------------------------------------------------------------------------------
 #endif//__HCS200_PROTOCOL_H__
