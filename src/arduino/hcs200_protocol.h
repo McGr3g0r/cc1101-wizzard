@@ -19,6 +19,8 @@ class HCS200Protocol: public Protocol
        String describe(uint32_t ts);
        int getMinPulses(void);
 
+       void setData(uint32_t enc, uint32_t serial, uint8_t btn, bool learn, bool battery_low, bool rpt);
+
     private:
         uint32_t enc;
         uint32_t serial;

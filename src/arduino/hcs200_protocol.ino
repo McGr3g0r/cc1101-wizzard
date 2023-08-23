@@ -183,6 +183,16 @@ bool HCS200Protocol::fromPulses(int pulses, uint16_t* buffer)
 }
 
 //------------------------------------------------------------------------------------------------------------------
+void HCS200Protocol::setData(uint32_t enc, uint32_t serial, uint8_t btn, bool learn, bool battery_low, bool rpt)
+{
+   this->enc = enc;
+   this->serial = serial;
+   this->btn = btn;
+   this-> battery_low = battery_low;
+   this->learn = learn;
+   this->rpt = rpt;
+}
+//------------------------------------------------------------------------------------------------------------------
 int HCS200Protocol::dataToBytes(void)
 {
     uint8_t button = btn;
