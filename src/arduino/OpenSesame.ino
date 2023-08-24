@@ -17,6 +17,7 @@ CmdStatus_e open_sesame_somfy_help(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setcode(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setmask(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setirange(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_somfy_setirangea(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[]);
 CmdHandler* getRootCommandHandler(void);
@@ -51,6 +52,7 @@ cmd_handler_t open_sesame_somfy_sub_cmd[] = {
    { &open_sesame_somfy_setcode,   &open_sesame_handler, NULL, "scod", "set codes c0<32bit hex> c1<32bit hex> c2<432bit hex>", 3, "xxx", "opensesame somfy scod 09800000 00000000 ffea8000"},
    { &open_sesame_somfy_setmask,   &open_sesame_handler, NULL, "smsk", "set iteration mask c0msk<hex> c1msk<hex> c2msk<hex>", 3, "xxx", "opensesame somfy smsk 007FFFFF FFFFFFFF 00070000"},
    { &open_sesame_somfy_setirange, &open_sesame_handler, NULL, "sir",  "set iteration range start_hi<hex> start_lo<hex> end_hi<hex> end_lo<hex>", 4, "xxxx", "opensesame somfy sir 00000000 00000000 FFFFFFFF FFFFFFFF"},
+   { &open_sesame_somfy_setirangea, &open_sesame_handler, NULL, "sira",  "set auto iteration, set mask first", 0, "", "opensesame somfy sira"},
    { &open_sesame_somfy_process  , &open_sesame_handler, NULL, "brute", "brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brute 10000<int ms>"},
    { &open_sesame_somfy_cont     , &open_sesame_handler, NULL, "brutc", "continue brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brutc 10000<int ms>"},
    { 0,  0, NULL, "",  "", 0, "","" }
@@ -174,7 +176,27 @@ CmdStatus_e open_sesame_somfy_setirange(void* parent,int argc, char* argv[])
    
    return CmdStatus_e::OK;
 }
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_somfy_setirangea(void* parent,int argc, char* argv[])
+{
 
+   if (somfy_ctx.c0msk ==0 && somfy_ctx.c1msk == 0 && somfy_ctx.c2msk == 0)
+   {
+       CmdHandler* handler = (CmdHandler*) parent;
+       handler->setHint("Set iteration mask first , smsk");
+       return WRONG_PARAMS;
+   }
+
+   uint32_t cnt = count_bits_set_uint32(somfy_ctx.c0msk);
+   cnt += count_bits_set_uint32(somfy_ctx.c1msk);
+   cnt += count_bits_set_uint32(somfy_ctx.c2msk);
+   
+   somfy_ctx.itstart = 0;
+    
+   somfy_ctx.itend =  bitscount_to_max_uint64(cnt);
+   
+   return CmdStatus_e::OK;
+}
 //------------------------------------------------------------------------------------------------------------------
 String open_sesame_somfy_ctx_describe(uint32_t c0, uint32_t c1, uint32_t c2, struct SomfyBruteContext_s& ctx, uint32_t startMs)
 {
