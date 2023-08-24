@@ -126,7 +126,7 @@ CmdStatus_e proto_somfy(void* parent,int argc, char* argv[])
       
      }
     
-     return OK;
+     return COMMAND_NOT_FOUND;
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e proto_ev1527(void* parent,int argc, char* argv[])
@@ -148,7 +148,7 @@ CmdStatus_e proto_ev1527(void* parent,int argc, char* argv[])
       
      }
     
-     return OK;
+     return COMMAND_NOT_FOUND;
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e proto_hcs200(void* parent,int argc, char* argv[])
@@ -170,7 +170,7 @@ CmdStatus_e proto_hcs200(void* parent,int argc, char* argv[])
       
      }
     
-     return OK;
+     return COMMAND_NOT_FOUND;
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e proto_somfy_help(void* parent,int argc, char* argv[])

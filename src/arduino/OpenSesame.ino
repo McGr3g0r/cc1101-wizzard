@@ -58,7 +58,7 @@ cmd_handler_t open_sesame_somfy_sub_cmd[] = {
 //------------------------------------------------------------------------------------------------------------------
 void opensesame_cmd_init(void)
 { 
-  open_sesame_sub_cmd[2].sub_cmd = open_sesame_somfy_sub_cmd;
+  open_sesame_sub_cmd[1].sub_cmd = open_sesame_somfy_sub_cmd;
   getRootCommandHandler()->registerHandler(&open_sesame_handler, open_sesame_sub_cmd); 
   somfy_ctx.c0 = 0x09800000;
   somfy_ctx.c1 = 0x00000000;
@@ -107,7 +107,7 @@ CmdStatus_e open_sesame_somfy(void* parent,int argc, char* argv[])
       
      }
     
-     return OK;
+     return COMMAND_NOT_FOUND;
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_help(void* parent,int argc, char* argv[])
