@@ -4,6 +4,7 @@
 //------------------------------------------------------------------------------------------------------------------
 
 bool isNumeric(char* str);
+bool isSignedNumeric(char* str);
 bool isFloat(char* str);
 bool isHex(char* str);
 bool isBool(char* str);
@@ -15,6 +16,8 @@ void apply_value_to_bitmask(uint32_t* b0, uint32_t* b1, uint32_t* b2, uint32_t m
 String millis_to_time(uint32_t ms);
 int count_bits_set_uint32(uint32_t v);
 uint64_t bitscount_to_max_uint64(int cnt);
+uint64_t bit_spread_assymetric(uint64_t val ,int bitsCount);
+uint64_t bit_spread_quad_assymetric(uint64_t val ,int bitsCount);
 //------------------------------------------------------------------------------------------------------------------
 #endif// _UTILS__H_
 //------------------------------------------------------------------------------------------------------------------

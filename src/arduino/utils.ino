@@ -31,6 +31,14 @@ bool isNumeric(char* str)
    return true;
 }
 //------------------------------------------------------------------------------------------------------------------
+bool isSignedNumeric(char* str)
+{
+  if (str[0] == '-')
+     return isNumeric(&str[1]);
+  else
+     return isNumeric(str);
+}
+//------------------------------------------------------------------------------------------------------------------
 bool isFloat(char* str)
 {
    char allowedChars[] = "+-.0123456789";
@@ -202,7 +210,6 @@ int count_bits_set_uint32(uint32_t v)
 
    return res;
 }
-
 //------------------------------------------------------------------------------------------------------------------
 uint64_t bitscount_to_max_uint64(int cnt)
 {
@@ -217,4 +224,40 @@ uint64_t bitscount_to_max_uint64(int cnt)
     }
     return res;
 }  
+
+//------------------------------------------------------------------------------------------------------------------
+uint64_t bit_spread_assymetric(uint64_t val ,int bitsCount)
+{
+   uint64_t v = 0;
+
+   for (int pos = 0; pos < bitsCount; pos++)
+   {
+      uint8_t bit = (val >> pos) & 0x01;
+      if ((pos & 0x01) == 0)
+         v |= (bit << (pos >> 1));
+      else
+         v |= (bit << (bitsCount - (1 +  (pos >> 1))));   
+   }
+   return v;
+}
+
+//------------------------------------------------------------------------------------------------------------------
+uint64_t bit_spread_quad_assymetric(uint64_t val ,int bitsCount)
+{
+   uint64_t v = 0;
+
+   for (int pos = 0; pos < bitsCount; pos+=4)
+   {
+      uint8_t bit1 = (val >> pos) & 0x01;
+      uint8_t bit2 = (val >> (pos+1)) & 0x01;
+      uint8_t bit3 = (val >> (pos+2)) & 0x01;
+      uint8_t bit4 = (val >> (pos+3)) & 0x01;
+      
+      v |= bit1 << (pos >> 2);
+      v |= bit2 << (bitsCount/2 - ((pos+1) >> 2));
+      v |= bit3 << (bitsCount/2 + ((pos+2) >> 2));     
+      v |= bit4 << (bitsCount - ((pos+3) >> 2));         
+   }
+   return v;
+}
 //------------------------------------------------------------------------------------------------------------------
