@@ -100,7 +100,7 @@ CmdStatus_e CmdHandler::handleSubCommand(cmd_handler_t* subCmd, int argc, char* 
               if (argc > argcoff)
               for (int currArg = argcoff; currArg < argc; currArg++)
               {
-                  if (sub_cmd->validation.length()>= currArg-1 && !validateArgumentType(argv[currArg], sub_cmd->validation[currArg-argcoff]))
+                  if (sub_cmd->validation.length()>= (currArg-argcoff)+1 && !validateArgumentType(argv[currArg], sub_cmd->validation[currArg-argcoff]))
                   {
                         setHint(sub_cmd->hint);
                         return WRONG_PARAMS;
@@ -185,8 +185,10 @@ String CmdHandler::getHint(void)
 //------------------------------------------------------------------------------------------------------------------
 bool CmdHandler::validateArgumentType(char *arg, char validationSymbol)
 {
-    if (validationSymbol == 'i')
-       return isNumeric(arg);
+    if (validationSymbol == 's')
+       return isSignedNumeric(arg);
+    else if (validationSymbol == 'i')
+       return isNumeric(arg);       
     else if (validationSymbol == 'f')
        return isFloat(arg); 
     else if (validationSymbol == 'x')
