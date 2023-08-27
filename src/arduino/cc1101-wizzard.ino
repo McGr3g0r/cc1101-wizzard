@@ -5,6 +5,7 @@
 #include "Terminal.h"
 #include "Processor.h"
 #include "CmdHandler.h"
+#include "settings.h"
 #include "radio_profile.h"
 #include "radio_pulses.h"
 //------------------------------------------------------------------------------------------------------------------
@@ -21,6 +22,10 @@ void help_cmd_init(void);
 void monitor_cmd_init(void);
 void opensesame_cmd_init(void);
 void protocols_cmd_init(void);
+void env_cmd_init(void);
+#if USE_FILE_SYSTEM == 1
+void files_cmd_init(void);
+#endif
 //------------------------------------------------------------------------------------------------------------------
 CmdHandler* getRootCommandHandler(void)
 {
@@ -34,6 +39,10 @@ void commands_init(void)
   monitor_cmd_init();
   opensesame_cmd_init();
   protocols_cmd_init();
+  #if USE_FILE_SYSTEM == 1
+  files_cmd_init();
+  #endif
+  env_cmd_init();
 }
 //------------------------------------------------------------------------------------------------------------------
 CC1101* getRadio() 

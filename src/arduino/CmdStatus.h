@@ -9,6 +9,7 @@ enum CmdStatus_e
   WRONG_PARAMS,
   COMMAND_NOT_FOUND,
   CC_ERROR,
+  FILE_ERROR
 };
 //------------------------------------------------------------------------------------------------------------------
 #endif// __CMD_STATUS_H__

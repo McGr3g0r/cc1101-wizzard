@@ -167,7 +167,10 @@ void CmdHandler::print_error(Stream& str)
             return;
       case CC_ERROR:
             str.println("CC1101 call error");
-            return;      
+            return;    
+       case FILE_ERROR:
+            str.println("file error");
+            return;               
       default:
         break;
     }
@@ -193,7 +196,7 @@ bool CmdHandler::validateArgumentType(char *arg, char validationSymbol)
        return isFloat(arg); 
     else if (validationSymbol == 'x')
        return isHex(arg);
-    else if (validationSymbol == 's')
+    else if (validationSymbol == 't')
        return true; 
     else if (validationSymbol == 'b')
        return isBool(arg);

@@ -84,7 +84,7 @@ cmd_handler_t radio_sub_cmd[] = {
    { &radio_getrssi,   &radio_handler,  NULL, "rssi", "Display quality information about last received frames over RF." , 0, "","radio rssi" },
    { &radio_scan   ,   &radio_handler,  NULL, "scan", "Scan frequency range <start> <stop> Khz for the highest signal." , 2, "ii","radio scan 433900<int> 434000<int>" },
    { &radio_profiles_list,   &radio_handler,  NULL, "prol", "list predefined radio profiels" , 0, "","radio prol" },
-   { &radio_profiles_apply, &radio_handler,  NULL, "proa", "apply profile by idx or name" , 1, "s","radio 1<int> or radio profile_name" },
+   { &radio_profiles_apply, &radio_handler,  NULL, "proa", "apply profile by idx or name" , 1, "t","radio 1<int> or radio profile_name" },
    { &radio_pulses_count,   &radio_handler,  NULL, "pulc", "get pulses count in buffer" , 0, "","radio pulc" },
    { &radio_pulses_flush,   &radio_handler,  NULL, "pulf", "flush puses buffer" , 0, "","radio pulf" },
    { &radio_pulses_show ,   &radio_handler,  NULL, "puls", "show puses buffer" , 0, "","radio puls" },
