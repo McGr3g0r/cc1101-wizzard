@@ -84,3 +84,20 @@ opensesame
 - prot : list registered protocols
 - somfy : somfy iterated frames flood
 ```
+
+files
+```
+- list : lists files in main folder
+- create : crate file: <filename>
+- remove : remove file: <filename> with pass code <aa55>
+- append : append text line to file 
+- cat : concatenates file: <filename>
+- readhex : readhex file: <filename> to <envname>
+```
+env
+```
+work in progress
+```
+
+
+If you like my work and like to support me ;) --> [Paypal](https://www.paypal.com/donate/?business=CE4764JYLBHK6&no_recurring=0&currency_code=USD).
