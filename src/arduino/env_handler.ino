@@ -129,7 +129,11 @@ CmdStatus_e env_set_int(void* parent,const char* name, const char* value)
          getRootCommandHandler()->setResultMessage("env name or value empty");
          return WRONG_PARAMS;
     }
-    int idx = env_find_free_idx();
+    int idx = env_find_idx_by_name(name);
+    
+    if (idx == -1)
+        idx = env_find_free_idx();
+
 
     if (idx == -1)
     {
@@ -141,6 +145,7 @@ CmdStatus_e env_set_int(void* parent,const char* name, const char* value)
    strncpy(env[idx].name,  name, min(strlen(name), ENV_NAME_MAXLEN));
    memset(env[idx].value, 0, ENV_VALUE_MAXLEN);
    strncpy(env[idx].value, value, min(strlen(value), ENV_VALUE_MAXLEN));
+   str_trim_end(env[idx].name);
    str_trim_end(env[idx].value);
    env[idx].used = true;
 
