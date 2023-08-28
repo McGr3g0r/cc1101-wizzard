@@ -84,3 +84,7 @@ opensesame
 - prot : list registered protocols
 - somfy : somfy iterated frames flood
 ```
+
+
+
+If you like my work and like to support me ;) --> [Paypal](https://www.paypal.com/donate/?business=CE4764JYLBHK6&no_recurring=0&currency_code=USD).
