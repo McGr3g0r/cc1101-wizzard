@@ -87,17 +87,46 @@ opensesame
 
 files
 ```
+- format : format LittleFS partition with pass code <aa55>
 - list : lists files in main folder
 - create : crate file: <filename>
 - remove : remove file: <filename> with pass code <aa55>
+- write : truncate file and write text line to file 
 - append : append text line to file 
 - cat : concatenates file: <filename>
-- readhex : readhex file: <filename> to <envname>
+- readenv : read file to env: <filename> to <envname>
 ```
 env
 ```
-work in progress
+- list : list enviroment variables
+- set : set variable <name> to <value>
+- unset : unsets variable
+- get : gets variable <name>
+- save : stores variables to /env.txt
+- load : reads variables from /env.txt
+
 ```
+
+Scripting.
+
+When flag USE_FILE_SYSTEM set to 1 in settings.h the LittleFS filesystem is enabled and files commands available.
+The scripting system looks for init.scr file at boot and loads it and then executes the lines from the file as it was input from console.
+Afhter the script is processed, the normal console input is available.
+How to create example script:
+```
+files append init.scr  include somfy.scr
+
+files append somfy.scr radio proa 1
+files append somfy.scr opensesame somfy scod 098cf670 af11caa9 ffea8000
+files append somfy.scr opensesame somfy smsk 0007fff0 00000000 00070000
+files append somfy.scr opensesame somfy sira
+files append somfy.scr opensesame somfy sirf os_somfy.txt
+files append somfy.scr opensesame somfy sibds 2
+files append somfy.scr opensesame somfy brutc 5000 -50 2000
+```
+
+The script will perform opensesame on somfy protocol with given parameters and will read the last bit counter from os_somfy.txt 
+If the user interrupts the opensesame command with ctrl-c it will be possible to continue it later with last bit couter.
 
 
 If you like my work and like to support me ;) --> [Paypal](https://www.paypal.com/donate/?business=CE4764JYLBHK6&no_recurring=0&currency_code=USD).
