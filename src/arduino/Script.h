@@ -1,25 +1,23 @@
 //------------------------------------------------------------------------------------------------------------------
-#ifndef __PARSER_H__
-#define __PARSER_H__
+#ifndef __SCRIPT_H__
+#define __SCRIPT_H__
 //------------------------------------------------------------------------------------------------------------------
-#include "Arduino.h"
-#define PARSER_MAX_PARAMS 16
+#include "LittleFS.h"
 //------------------------------------------------------------------------------------------------------------------
-class Parser
+class Script
 {
   public:
-  
-    bool parse(String line);
-    int getArgc(void);
-    char** getArgv(void);
+    Script(void);
+    bool load(const char* path);
+    void close();
+
+    int available(void);
+    String getLine(void);
 
   private:
-   char buffer[160];
-   int argc;
-   char* argv[PARSER_MAX_PARAMS];
-
-   void apply_env(void);
+    File scr;
+    String readLine(void);
 };
 //------------------------------------------------------------------------------------------------------------------
-#endif// __PARSER_H__
+#endif// __SCRIPT_H__
 //------------------------------------------------------------------------------------------------------------------

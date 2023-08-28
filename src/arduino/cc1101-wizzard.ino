@@ -2,6 +2,7 @@
 #include "cc1101.h"
 #include "platform.h"
 #include "Parser.h"
+#include "Script.h"
 #include "Terminal.h"
 #include "Processor.h"
 #include "CmdHandler.h"
@@ -16,6 +17,7 @@ Parser parser;
 Terminal term(CMD_MAX_BUFFER_LEN);
 CmdHandler handler;
 Processor proc;
+Script script;
 //------------------------------------------------------------------------------------------------------------------
 void radio_cmd_init(void);
 void help_cmd_init(void);
@@ -88,14 +90,21 @@ void setup() {
 
      #if USE_FILE_SYSTEM == 1
      env_load(0, 0, 0);
+     script.load("/init.scr");
      #endif
      
 }
 //------------------------------------------------------------------------------------------------------------------
 void loop() {
-
-  term.input(Serial);
-
+#if USE_FILE_SYSTEM == 1
+  if (script.available())
+  {
+    term.input(script.getLine());
+  } else 
+#endif  
+  {
+    term.input(Serial);
+  }
   if (term.available())
   {
       bool cmdOk = false;

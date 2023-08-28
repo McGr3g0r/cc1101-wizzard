@@ -18,6 +18,7 @@ int count_bits_set_uint32(uint32_t v);
 uint64_t bitscount_to_max_uint64(int cnt);
 uint64_t bit_spread_assymetric(uint64_t val ,int bitsCount);
 uint64_t bit_spread_quad_assymetric(uint64_t val ,int bitsCount);
+void str_trim_end(char* txt);
 //------------------------------------------------------------------------------------------------------------------
 #endif// _UTILS__H_
 //------------------------------------------------------------------------------------------------------------------

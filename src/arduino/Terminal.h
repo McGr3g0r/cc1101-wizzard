@@ -11,6 +11,7 @@ class Terminal
     Terminal(int lineSize);
     void clear(void);
     void input(Stream& term);
+    void input(String line);
     void setEcho(bool enabled);
     String getLine(void);
     bool available();

@@ -20,6 +20,7 @@ CmdStatus_e env_set_int(void* parent,const char* name, const char* value);
 #if USE_FILE_SYSTEM == 1
 #include "LittleFS.h"
 LittleFSConfig cfg;
+ char text[128];
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t files_handler = { &files_main, NULL, NULL, "files", "Files utils, use: 'files help'", 0, "", "files help" };
 //------------------------------------------------------------------------------------------------------------------
@@ -179,7 +180,7 @@ CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer,
     if (f)
     {
         f.print(buffer);
-        f.println();
+        f.print("\n");
         f.close();
         return OK;
     } else {
@@ -193,7 +194,6 @@ CmdStatus_e files_write(void* parent,int argc, char* argv[])
 {
 
     char *fname = argv[2];
-    char text[64];
     memset(text, 0, sizeof(text));
     
     for (int idx = 3; idx < argc; idx++)
@@ -209,7 +209,6 @@ CmdStatus_e files_write(void* parent,int argc, char* argv[])
 CmdStatus_e files_append(void* parent,int argc, char* argv[])
 {
     char *fname = argv[2];
-    char text[64];
     
     memset(text, 0, sizeof(text));
     

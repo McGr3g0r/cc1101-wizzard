@@ -10,6 +10,9 @@
 #include "radio_profile.h"
 #include "radio_pulses.h"
 #include "utils.h"
+#if USE_FILE_SYSTEM == 1
+#include "LittleFS.h"
+#endif
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_main(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy(void* parent,int argc, char* argv[]);
@@ -19,13 +22,19 @@ CmdStatus_e open_sesame_somfy_setmask(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setirange(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setibds(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_setirangea(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_somfy_setcurr(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_somfy_setcurrf(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_processr(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[]);
 CmdHandler* getRootCommandHandler(void);
+
+CmdStatus_e env_set_int(void* parent,const char* name, const char* value);
+
 CC1101* getRadio(void);
 #if USE_FILE_SYSTEM == 1
 CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer, const char* openmode);
+CmdStatus_e files_readenv(void* parent,int argc, char* argv[]);
 #endif
 //------------------------------------------------------------------------------------------------------------------
 extern SomfyRTSProtocol somfy;
@@ -62,10 +71,14 @@ cmd_handler_t open_sesame_somfy_sub_cmd[] = {
    { &open_sesame_somfy_setmask,   &open_sesame_handler, NULL, "smsk", "set iteration mask c0msk<hex> c1msk<hex> c2msk<hex>", 3, "xxx", "opensesame somfy smsk 007FFFFF FFFFFFFF 00070000"},
    { &open_sesame_somfy_setirange, &open_sesame_handler, NULL, "sir",  "set iteration range start_hi<hex> start_lo<hex> end_hi<hex> end_lo<hex>", 4, "xxxx", "opensesame somfy sir 00000000 00000000 FFFFFFFF FFFFFFFF"},
    { &open_sesame_somfy_setirangea, &open_sesame_handler, NULL, "sira",  "set auto iteration, set mask first", 0, "", "opensesame somfy sira"},
+   { &open_sesame_somfy_setcurr, &open_sesame_handler, NULL, "sirs",  "set current iteration value, set mask first, curr_hi<hex> curr_lo<hex>", 2, "xx", "opensesame somfy sirs 0x00000000 0x0000ffff"},
+   #if USE_FILE_SYSTEM == 1
+   { &open_sesame_somfy_setcurrf, &open_sesame_handler, NULL, "sirf",  "set current iteration from file, set mask first, filename<txt>", 1, "t", "opensesame somfy sirf os_somfy.txt"},
+   #endif
    { &open_sesame_somfy_setibds,   &open_sesame_handler, NULL, "sibds",  "set iteration bit dispersion strategy: 0 - none, 1 - assymetric, 2 - quad-asssymetric", 1, "i", "opensesame somfy sibds 1"},
    { &open_sesame_somfy_process  , &open_sesame_handler, NULL, "brute", "brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brute 10000<int ms>"},
    { &open_sesame_somfy_processr , &open_sesame_handler, NULL, "brutr", "brute iteration of codes, display interval<int> minrssi<i>, if rssi > minrssi then wait for clear channel, wait after rssi detected <int> ms", 3, "isi", "opensesame somfy brute 10000<int ms> -60<int> 1000<int ms>"},
-   { &open_sesame_somfy_cont     , &open_sesame_handler, NULL, "brutc", "continue brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brutc 10000<int ms>"},
+   { &open_sesame_somfy_cont     , &open_sesame_handler, NULL, "brutc", "continue brute iteration of codes, display interval<int> if rssi > minrssi then wait for clear channel, wait after rssi detected <int> ms", 3, "isi", "opensesame somfy brutc 10000<int ms> -60<int> 1000<int ms>"},
    { 0,  0, NULL, "",  "", 0, "","" }
 };
 //------------------------------------------------------------------------------------------------------------------
@@ -189,6 +202,56 @@ CmdStatus_e open_sesame_somfy_setirange(void* parent,int argc, char* argv[])
    
    return CmdStatus_e::OK;
 }
+
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_somfy_setcurr(void* parent,int argc, char* argv[])
+{
+   uint32_t h = strtoul(argv[3], 0, 16);
+   uint32_t l = strtoul(argv[4], 0, 16); 
+   
+   somfy_ctx.curr = l;
+   somfy_ctx.curr |= (uint64_t)((uint64_t)h << 32);
+   
+   return CmdStatus_e::OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+#if USE_FILE_SYSTEM == 1
+CmdStatus_e open_sesame_somfy_setcurrf(void* parent,int argc, char* argv[])
+{
+
+   char path[32];
+   uint32_t l, h = 0 ;
+   
+   sprintf(path, "/%s", argv[3]);
+   if (LittleFS.exists(path))
+   {
+      File f = LittleFS.open(path, "r");
+      if (f)
+      {
+          String s1 = f.readStringUntil(' ');
+          String s2 = f.readStringUntil('\n');
+          if (s1[s1.length() -1] == ' ')
+              s1 = s1.substring(0, s1.length());
+          if (s2[s2.length() -1] == '\n')
+              s2 = s2.substring(0, s2.length());   
+          if (s2[s2.length() -1] == '\r')
+              s2 = s2.substring(0, s2.length());    
+                  
+          h = strtoul(s1.c_str(), 0, 16);
+          l = strtoul(s2.c_str(), 0, 16);
+          f.close();
+      } else {
+        l = 0;
+        h = 0;
+      }
+   }
+    
+   somfy_ctx.curr = l;
+   somfy_ctx.curr |= (uint64_t)((uint64_t)h << 32);
+   
+   return CmdStatus_e::OK;
+}
+#endif
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_setibds(void* parent,int argc, char* argv[])
 {
@@ -275,6 +338,7 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
     uint32_t c0;
     uint32_t c1;
     uint32_t c2;
+    uint32_t h,l;
     int pulses;
     int p;
     char buff[64];
@@ -311,14 +375,18 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
     STDOUT.print(" code1msk:");print_hex_uint32(STDOUT, somfy_ctx.c0msk);
     STDOUT.print(" code2msk:");print_hex_uint32(STDOUT, somfy_ctx.c1msk);
     STDOUT.print(" code3msk:");print_hex_uint32(STDOUT, somfy_ctx.c2msk);
+    STDOUT.print("\n\r");
     STDOUT.print(" start:");print_hex_uint64(STDOUT, somfy_ctx.itstart); 
     STDOUT.print(" end:");print_hex_uint64(STDOUT, somfy_ctx.itend);
+    STDOUT.print(" curr:");print_hex_uint64(STDOUT, somfy_ctx.curr); 
     STDOUT.print("\n\r");
     STDOUT.println(" press ctrl-c/f/d to terminate...");
 
 
     if (!somfy_ctx.cont)
+    {
         somfy_ctx.curr = somfy_ctx.itstart;
+    }
     else
         somfy_ctx.cont = false;
 
@@ -386,8 +454,14 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
        #if USE_FILE_SYSTEM == 1
        if (somfy_ctx.curr  > 0 && somfy_ctx.curr % OS_ITERATION_FILE_AUTO_DUMP == 0)
        {
-            sprintf(buff, "%08x%08x", (uint32_t)((somfy_ctx.curr  >> 32) & 0xffffffff), (uint32_t)(somfy_ctx.curr & 0xffffffff));
-            files_write_int(parent, "/os_somfy.txt", buff, "w");      
+            h = (somfy_ctx.curr  >> 32) & 0xffffffff;
+            l = (somfy_ctx.curr & 0xffffffff);
+            sprintf(buff, "%08x %08x", (uint32_t)(h), (uint32_t)(l));
+            files_write_int(parent, "/os_somfy.txt", buff, "w");
+            sprintf(buff, "%08x", (uint32_t)(h));
+            env_set_int(parent , "sirsh", buff);
+            sprintf(buff, "%08x", (uint32_t)(l));
+            env_set_int(parent , "sirsl", buff);      
        }
        #endif
       
@@ -404,8 +478,14 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
     }
     #if USE_FILE_SYSTEM == 1
     //store last counter
-    sprintf(buff, "%08x%08x", (uint32_t)((somfy_ctx.curr  >> 32) & 0xffffffff), (uint32_t)(somfy_ctx.curr & 0xffffffff));
+    h = (somfy_ctx.curr  >> 32) & 0xffffffff;
+    l = (somfy_ctx.curr & 0xffffffff);   
+    sprintf(buff, "%08x %08x", (uint32_t)(h), (uint32_t)(l));
     files_write_int(parent, "/os_somfy.txt", buff, "w");
+    sprintf(buff, "%08x", (uint32_t)(h));
+    env_set_int(parent , "sirsh", buff);
+    sprintf(buff, "%08x", (uint32_t)(l));
+    env_set_int(parent , "sirsl", buff);   
     #endif
     msg = "brut last tx:" + open_sesame_somfy_ctx_describe(c0,c1,c2,somfy_ctx, startMs);
     STDOUT.print(msg); STDOUT.print("\n\r");
@@ -417,16 +497,8 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[])
 {
-    uint32_t disp = atoi(argv[3]);
-    
-    if (disp == 0 || disp < 2000 || disp > 360000)
-    {
-         getRootCommandHandler()->setResultMessage("wrong display period");
-         return WRONG_PARAMS;
-    }
-
     somfy_ctx.cont = true;
 
-    return open_sesame_somfy_process(parent, argc, argv);
+    return open_sesame_somfy_processr(parent, argc, argv);
 }
 //------------------------------------------------------------------------------------------------------------------

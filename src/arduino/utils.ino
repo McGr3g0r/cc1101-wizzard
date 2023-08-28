@@ -95,6 +95,16 @@ bool intInSet(int val, int* intSet, int size)
    return false;
 }
 //------------------------------------------------------------------------------------------------------------------
+void str_trim_end(char* txt)
+{
+  for (int idx = strlen(txt) -1 ; idx >= 0; idx--)
+  {
+    if (txt[idx] == '\n' || txt[idx] == '\r' || txt[idx] == ' ')
+        txt[idx] = 0;
+  }
+  
+}
+//------------------------------------------------------------------------------------------------------------------
 unsigned char reverse8(unsigned char b)
 {
     b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
