@@ -59,9 +59,10 @@ Processor* getProc()
 }
 //------------------------------------------------------------------------------------------------------------------
 void setup() {
+     uint32_t s = millis();
      Serial.begin(115200);
 
-     while (!Serial);
+     while (!Serial && millis() -s < 1000);
      delay(1000);
      
      Serial.println(F("CC1101 Wizard tool connected, use 'help' for list of commands...\n\r"));
