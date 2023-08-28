@@ -11,6 +11,7 @@
 CmdStatus_e env_main(void* parent,int argc, char* argv[]);
 CmdStatus_e env_list(void* parent,int argc, char* argv[]);
 CmdStatus_e env_set(void* parent,int argc, char* argv[]);
+CmdStatus_e env_set_int(void* parent,const char* name, const char* value);
 CmdStatus_e env_unset(void* parent,int argc, char* argv[]);
 #if USE_FILE_SYSTEM == 1
 CmdStatus_e env_save(void* parent,int argc, char* argv[]);
@@ -119,12 +120,9 @@ int env_find_idx_by_name(const char* name)
      return -1;
 }
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e env_set(void* parent,int argc, char* argv[])
+CmdStatus_e env_set_int(void* parent,const char* name, const char* value)
 {
-    char *ename = argv[2];
-    char *eval = argv[3];
-
-    if (strlen(ename) == 0 || strlen(eval) == 0)
+    if (strlen(name) == 0 || strlen(value) == 0)
     {
          getRootCommandHandler()->setResultMessage("env name or value empty");
          return WRONG_PARAMS;
@@ -137,11 +135,19 @@ CmdStatus_e env_set(void* parent,int argc, char* argv[])
          return WRONG_PARAMS;
     }   
         
-   strncpy(env[idx].name, ename, min(strlen(ename), ENV_NAME_MAXLEN));
-   strncpy(env[idx].value, eval, min(strlen(eval), ENV_VALUE_MAXLEN));
+   strncpy(env[idx].name,  name, min(strlen(name), ENV_NAME_MAXLEN));
+   strncpy(env[idx].value, value, min(strlen(value), ENV_VALUE_MAXLEN));
    env[idx].used = true;
 
    return OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e env_set(void* parent,int argc, char* argv[])
+{
+    char *ename = argv[2];
+    char *eval = argv[3];
+
+    return env_set_int(parent, ename, eval);
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e env_unset(void* parent,int argc, char* argv[])

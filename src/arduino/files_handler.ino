@@ -5,13 +5,17 @@
 #include "utils.h"
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e files_main(void* parent,int argc, char* argv[]);
+CmdStatus_e files_format(void* parent,int argc, char* argv[]);
 CmdStatus_e files_list(void* parent,int argc, char* argv[]);
 CmdStatus_e files_create(void* parent,int argc, char* argv[]);
 CmdStatus_e files_remove(void* parent,int argc, char* argv[]);
 CmdStatus_e files_append(void* parent,int argc, char* argv[]);
+CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer, const char* openmode);
+CmdStatus_e files_write(void* parent,int argc, char* argv[]);
 CmdStatus_e files_cat(void* parent,int argc, char* argv[]);
-CmdStatus_e files_readhex(void* parent,int argc, char* argv[]);
+CmdStatus_e files_readenv(void* parent,int argc, char* argv[]);
 CmdHandler* getRootCommandHandler(void);
+CmdStatus_e env_set_int(void* parent,const char* name, const char* value);
 //------------------------------------------------------------------------------------------------------------------
 #if USE_FILE_SYSTEM == 1
 #include "LittleFS.h"
@@ -21,12 +25,14 @@ cmd_handler_t files_handler = { &files_main, NULL, NULL, "files", "Files utils, 
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t files_sub_cmd[] = {
    { &files_main,    &files_handler,   NULL, "help",  "this help", 0, "", "files help"},
+   { &files_format,    &files_handler,   NULL, "format",  "format LittleFS partition with pass code <aa55>", 1, "x", "files format aa55"},
    { &files_list,    &files_handler,   NULL, "list",  "lists files in main folder", 0, "", "files list"},
    { &files_create,    &files_handler,   NULL, "create",  "crate file: <filename>", 1, "t", "files create name.txt"},
    { &files_remove,    &files_handler,   NULL, "remove",  "remove file: <filename> with pass code <aa55>", 2, "tx", "files remove name.txt aa55"},
+   { &files_write,    &files_handler,   NULL, "write",  "truncate file and write text line to file ", 2, "tt", "files write name.txt test2 test3 test4"},
    { &files_append,    &files_handler,   NULL, "append",  "append text line to file ", 2, "tt", "files append name.txt test2 test3 test4"},
    { &files_cat,    &files_handler,   NULL, "cat",  "concatenates file: <filename>", 1, "t", "files cat name.txt"},
-   { &files_readhex,    &files_handler,   NULL, "readhex",  "readhex file: <filename> to <envname>", 2, "tt", "files readhex name.txt env1"},
+   { &files_readenv,    &files_handler,   NULL, "readenv",  "read file to env: <filename> to <envname>", 2, "tt", "files readenv name.txt env1"},
    { 0,  0, NULL, "",  "", 0, "","" }
 };
 //------------------------------------------------------------------------------------------------------------------
@@ -81,7 +87,7 @@ CmdStatus_e files_create(void* parent,int argc, char* argv[])
     char path[32];
     CmdHandler* handler = (CmdHandler*) parent;
   
-    if (strlen(fname) < 2 || strlen(fname) > 11)
+    if (strlen(fname) < 2 || strlen(fname) > FS_FILE_NAME_MAXLEN)
     {
        handler->setHint("wrong file name use dos-like file names");
        return WRONG_PARAMS;
@@ -99,7 +105,29 @@ CmdStatus_e files_create(void* parent,int argc, char* argv[])
       return FILE_ERROR;
     }
 }
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e files_format(void* parent,int argc, char* argv[])
+{
+    int passcode =  strtoul(argv[2], 0, 16);
 
+    CmdHandler* handler = (CmdHandler*) parent;
+
+    if (passcode != 0xaa55)
+    {
+       handler->setHint("wrong pass code");
+       return WRONG_PARAMS;
+    }
+
+    LittleFS.end();  
+    if (LittleFS.format())
+    {
+         LittleFS.begin();
+         return OK;
+    } else {
+      handler->setHint("format did not succeeded, please reboot");
+      return FILE_ERROR;
+    }
+}
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e files_remove(void* parent,int argc, char* argv[])
 {
@@ -110,7 +138,7 @@ CmdStatus_e files_remove(void* parent,int argc, char* argv[])
 
     CmdHandler* handler = (CmdHandler*) parent;
   
-    if (strlen(fname) < 2 || strlen(fname) > 11)
+    if (strlen(fname) < 2 || strlen(fname) > FS_FILE_NAME_MAXLEN)
     {
        handler->setHint("wrong file name use dos-like file names");
        return WRONG_PARAMS;
@@ -133,37 +161,65 @@ CmdStatus_e files_remove(void* parent,int argc, char* argv[])
     }
 }
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e files_append(void* parent,int argc, char* argv[])
+CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer, const char* openmode)
 {
-
-    char *fname = argv[2];
-    char path[32];
     CmdHandler* handler = (CmdHandler*) parent;
+    char msg[64];
+    int maxFileNameLen = FS_FILE_NAME_MAXLEN;
+    if (fname[0] == '/')
+        maxFileNameLen++;
   
-    if (strlen(fname) < 2 || strlen(fname) > 11)
+    if (strlen(fname) < 2 || strlen(fname) > maxFileNameLen || strlen(openmode) != 1)
     {
-       handler->setHint("wrong file name use dos-like file names");
+       handler->setHint("wrong file name use dos-like file names or openmode - w,w+,a,a+");
        return WRONG_PARAMS;
     }
-
-    sprintf(path,"/%s", fname);
     
-    File f = LittleFS.open(path, "a");
+    File f = LittleFS.open(fname, openmode);
     if (f)
     {
-        for (int pos = 3; pos < argc; pos++)
-        {
-          f.print(argv[pos]);
-          if (pos < argc -1 )
-             f.print(" ");
-        }
+        f.print(buffer);
         f.println();
         f.close();
         return OK;
     } else {
-      handler->setHint("file append failed!.");
+      sprintf(msg, "file write: %s failed!.", openmode);
+      handler->setHint(msg);
       return FILE_ERROR;
     }
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e files_write(void* parent,int argc, char* argv[])
+{
+
+    char *fname = argv[2];
+    char text[64];
+    memset(text, 0, sizeof(text));
+    
+    for (int idx = 3; idx < argc; idx++)
+    {   if (idx > 3)
+          strcat(text, " ");   
+        strcat(text, argv[idx]);
+    }
+        
+    return files_write_int(parent, fname, text, "w");
+  
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e files_append(void* parent,int argc, char* argv[])
+{
+    char *fname = argv[2];
+    char text[64];
+    
+    memset(text, 0, sizeof(text));
+    
+    for (int idx = 3; idx < argc; idx++)
+    {   if (idx > 3)
+          strcat(text, " ");   
+        strcat(text, argv[idx]);
+    }
+        
+    return files_write_int(parent, fname, text, "a");
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e files_cat(void* parent,int argc, char* argv[])
@@ -174,7 +230,7 @@ CmdStatus_e files_cat(void* parent,int argc, char* argv[])
 
     CmdHandler* handler = (CmdHandler*) parent;
   
-    if (strlen(fname) < 2 || strlen(fname) > 11)
+    if (strlen(fname) < 2 || strlen(fname) > FS_FILE_NAME_MAXLEN)
     {
        handler->setHint("wrong file name use dos-like file names");
        return WRONG_PARAMS;
@@ -199,8 +255,40 @@ CmdStatus_e files_cat(void* parent,int argc, char* argv[])
     }
 }
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e files_readhex(void* parent,int argc, char* argv[])
+CmdStatus_e files_readenv(void* parent,int argc, char* argv[])
 {
+    char path[32];
+    char *fname = argv[2];
+    char *ename = argv[3];
+    String s;
+
+    CmdHandler* handler = (CmdHandler*) parent;
+  
+    if (strlen(fname) < 2 || strlen(fname) > FS_FILE_NAME_MAXLEN)
+    {
+       handler->setHint("wrong file name use dos-like file names");
+       return WRONG_PARAMS;
+    }
+    if (strlen(ename) < 2)
+    {
+       handler->setHint("wrong env name");
+       return WRONG_PARAMS;      
+    }
+
+    sprintf(path,"/%s", fname);
+    if (LittleFS.exists(path))
+    {
+         File f = LittleFS.open(path, "r");
+         while (f.available())
+         {
+             s = f.readStringUntil('\n');
+         }
+         f.close();
+         return env_set_int(parent, ename, s.c_str());
+    } else {
+      handler->setHint("file does not extists!.");
+      return FILE_ERROR;
+    }
   return FILE_ERROR;
 }
 //------------------------------------------------------------------------------------------------------------------

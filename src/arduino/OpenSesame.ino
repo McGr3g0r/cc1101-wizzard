@@ -24,6 +24,9 @@ CmdStatus_e open_sesame_somfy_processr(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[]);
 CmdHandler* getRootCommandHandler(void);
 CC1101* getRadio(void);
+#if USE_FILE_SYSTEM == 1
+CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer, const char* openmode);
+#endif
 //------------------------------------------------------------------------------------------------------------------
 extern SomfyRTSProtocol somfy;
 Protocol* osprots[] = { &somfy };
@@ -237,11 +240,6 @@ CmdStatus_e open_sesame_somfy_processr(void* parent,int argc, char* argv[])
     int rssi = atoi(argv[4]);
 
     int wait_after_rssi = atoi(argv[5]);
-
-    STDOUT.print("d1:");
-    STDOUT.print(disp);STDOUT.print(" ");
-    STDOUT.print(rssi);STDOUT.print(" ");
-    STDOUT.print(wait_after_rssi);STDOUT.println(" ");
     
     if (disp == 0 || disp < 2000 || disp > 360000)
     {
@@ -279,6 +277,7 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
     uint32_t c2;
     int pulses;
     int p;
+    char buff[64];
     
     if (disp == 0 || disp < 2000 || disp > 360000)
     {
@@ -384,17 +383,30 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
        }
 
        somfy_ctx.curr++;
-        if (STDIN.available() > 0)
-        {
-           byte c = STDIN.read();
-           
-           if (c == CTRL_C || c == CTRL_F || c == CTRL_D)
-           {
-               cont = false;
-               continue;
-           }
-        }
+       #if USE_FILE_SYSTEM == 1
+       if (somfy_ctx.curr  > 0 && somfy_ctx.curr % OS_ITERATION_FILE_AUTO_DUMP == 0)
+       {
+            sprintf(buff, "%08x%08x", (uint32_t)((somfy_ctx.curr  >> 32) & 0xffffffff), (uint32_t)(somfy_ctx.curr & 0xffffffff));
+            files_write_int(parent, "/os_somfy.txt", buff, "w");      
+       }
+       #endif
+      
+       if (STDIN.available() > 0)
+       {
+          byte c = STDIN.read();
+          
+          if (c == CTRL_C || c == CTRL_F || c == CTRL_D)
+          {
+              cont = false;
+              continue;
+          }
+       }
     }
+    #if USE_FILE_SYSTEM == 1
+    //store last counter
+    sprintf(buff, "%08x%08x", (uint32_t)((somfy_ctx.curr  >> 32) & 0xffffffff), (uint32_t)(somfy_ctx.curr & 0xffffffff));
+    files_write_int(parent, "/os_somfy.txt", buff, "w");
+    #endif
     msg = "brut last tx:" + open_sesame_somfy_ctx_describe(c0,c1,c2,somfy_ctx, startMs);
     STDOUT.print(msg); STDOUT.print("\n\r");
     STDOUT.print("brute stop\n\r");
