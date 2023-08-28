@@ -25,6 +25,7 @@ void protocols_cmd_init(void);
 void env_cmd_init(void);
 #if USE_FILE_SYSTEM == 1
 void files_cmd_init(void);
+CmdStatus_e env_load(void* parent,int argc, char* argv[]);
 #endif
 //------------------------------------------------------------------------------------------------------------------
 CmdHandler* getRootCommandHandler(void)
@@ -84,6 +85,10 @@ void setup() {
      
      term.setEcho(true);
      term.clear();
+
+     #if USE_FILE_SYSTEM == 1
+     env_load(0, 0, 0);
+     #endif
      
 }
 //------------------------------------------------------------------------------------------------------------------
