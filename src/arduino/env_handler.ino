@@ -21,9 +21,6 @@ CmdStatus_e env_load_cmd(void* parent,int argc, char* argv[]);
 #endif
 CmdHandler* getRootCommandHandler(void);
 //------------------------------------------------------------------------------------------------------------------
-char* env_get(const char* name, const char* defval);
-bool  env_set(const char* name, const char* val);
-//------------------------------------------------------------------------------------------------------------------
 typedef struct env_item_s
 {
   char name[ENV_NAME_MAXLEN+1];

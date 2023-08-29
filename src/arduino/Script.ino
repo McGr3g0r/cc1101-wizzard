@@ -57,7 +57,7 @@ Script::Script(void)
     String line = scr.readStringUntil('\n');
     if (line.startsWith("include "))
     {
-      String fname = line.substring(8, line.length() - 1);
+      String fname = line.substring(8, line.length());
       scr.close();
       scr = LittleFS.open("/" + fname, "r");
       if (scr)

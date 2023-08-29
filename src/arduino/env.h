@@ -2,7 +2,7 @@
 #ifndef __ENV_H__
 #define __ENV_H__
 //------------------------------------------------------------------------------------------------------------------
-char* env_get(const char* name, const char* defval);
+char* env_get(const char* name, char* defval);
 bool  env_set(const char* name, const char* val);
 bool  env_load(void);
 //------------------------------------------------------------------------------------------------------------------

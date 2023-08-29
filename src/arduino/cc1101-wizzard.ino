@@ -54,6 +54,7 @@ CC1101* getRadio()
 }
 //------------------------------------------------------------------------------------------------------------------
 void setup() {
+     String tmp;
      uint32_t s = millis();
      Serial.begin(115200);
 
@@ -86,7 +87,11 @@ void setup() {
 
      #if USE_FILE_SYSTEM == 1
      env_load();
-     script.load("/init.scr");
+     tmp = env_get("init", "none");
+     if (tmp == "none")
+         script.load("/init.scr");
+     else
+         script.load(String("/"+ tmp).c_str());
      #endif
      
 }
