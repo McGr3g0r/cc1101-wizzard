@@ -8,18 +8,21 @@
 #include "LittleFS.h"
 #endif
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e env_main(void* parent,int argc, char* argv[]);
-CmdStatus_e env_list(void* parent,int argc, char* argv[]);
-CmdStatus_e env_set(void* parent,int argc, char* argv[]);
+CmdStatus_e env_main_cmd(void* parent,int argc, char* argv[]);
+CmdStatus_e env_show_cmd(void* parent,int argc, char* argv[]);
+CmdStatus_e env_set_cmd(void* parent,int argc, char* argv[]);
+CmdStatus_e env_get_cmd(void* parent,int argc, char* argv[]);
 CmdStatus_e env_set_int(void* parent,const char* name, const char* value);
 CmdStatus_e env_get_int(void* parent,const char* name, const char* value);
-char* env_get_direct(const char* name, const char* defval);
-CmdStatus_e env_unset(void* parent,int argc, char* argv[]);
+CmdStatus_e env_unset_cmd(void* parent,int argc, char* argv[]);
 #if USE_FILE_SYSTEM == 1
-CmdStatus_e env_save(void* parent,int argc, char* argv[]);
-CmdStatus_e env_load(void* parent,int argc, char* argv[]);
+CmdStatus_e env_save_cmd(void* parent,int argc, char* argv[]);
+CmdStatus_e env_load_cmd(void* parent,int argc, char* argv[]);
 #endif
 CmdHandler* getRootCommandHandler(void);
+//------------------------------------------------------------------------------------------------------------------
+char* env_get(const char* name, const char* defval);
+bool  env_set(const char* name, const char* val);
 //------------------------------------------------------------------------------------------------------------------
 typedef struct env_item_s
 {
@@ -30,17 +33,17 @@ typedef struct env_item_s
 //------------------------------------------------------------------------------------------------------------------
 env_item_t env[ENV_MAX_ITEMS];
 //------------------------------------------------------------------------------------------------------------------
-cmd_handler_t env_handler = { &env_main, NULL, NULL, "env", "enviroment variables utils, use: 'env help'", 0, "", "env help" };
+cmd_handler_t env_handler = { &env_main_cmd, NULL, NULL, "env", "enviroment variables utils, use: 'env help'", 0, "", "env help" };
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t env_sub_cmd[] = {
-   { &env_main,    &env_handler,   NULL, "help",  "this help", 0, "", "env help"},
-   { &env_list,    &env_handler,   NULL, "list",  "list enviroment variables", 0, "", "env list"},
-   { &env_set,     &env_handler,   NULL, "set",  "set variable <name> to <value>", 2, "tt", "env set kaboom<text> 25<text>"},
-   { &env_unset,   &env_handler,   NULL, "unset", "unsets variable", 1, "t", "env unset kaboom<text>"},
-   { &env_get,     &env_handler,   NULL, "get", "gets variable <name>", 1, "t", "env get kaboom<text>"},   
+   { &env_main_cmd,    &env_handler,   NULL, "help",  "this help", 0, "", "env help"},
+   { &env_show_cmd,    &env_handler,   NULL, "show",  "list enviroment variables", 0, "", "env show"},
+   { &env_set_cmd,     &env_handler,   NULL, "set",  "set variable <name> to <value>", 2, "tt", "env set kaboom<text> 25<text>"},
+   { &env_unset_cmd,   &env_handler,   NULL, "unset", "unsets variable", 1, "t", "env unset kaboom<text>"},
+   { &env_get_cmd,     &env_handler,   NULL, "get", "gets variable <name>", 1, "t", "env get kaboom<text>"},   
 #if USE_FILE_SYSTEM == 1
-   { &env_save,   &env_handler,   NULL, "save", "stores variables to /env.txt", 0, "", "env store"},
-   { &env_load,    &env_handler,   NULL, "load", "reads variables from /env.txt", 0, "", "env load"},
+   { &env_save_cmd,   &env_handler,   NULL, "save", "stores variables to /env.txt", 0, "", "env store"},
+   { &env_load_cmd,    &env_handler,   NULL, "load", "reads variables from /env.txt", 0, "", "env load"},
 #endif
    
    { 0,  0, NULL, "",  "", 0, "","" }
@@ -57,7 +60,7 @@ void env_cmd_init(void)
   getRootCommandHandler()->registerHandler(&env_handler, env_sub_cmd); 
 }
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e env_main(void* parent,int argc, char* argv[])
+CmdStatus_e env_main_cmd(void* parent,int argc, char* argv[])
 {
      STDOUT.println(env_handler.desc);
 
@@ -78,7 +81,7 @@ CmdStatus_e env_main(void* parent,int argc, char* argv[])
      return OK;
 }
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e env_list(void* parent,int argc, char* argv[])
+CmdStatus_e env_show_cmd(void* parent,int argc, char* argv[])
 {
      STDOUT.println("env:");
 
@@ -122,6 +125,27 @@ int env_find_idx_by_name(const char* name)
      return -1;
 }
 //------------------------------------------------------------------------------------------------------------------
+bool env_set(const char* name, const char* value)
+{
+    int idx = env_find_idx_by_name(name);
+    
+    if (idx == -1)
+        idx = env_find_free_idx();
+
+    if (idx == -1)    
+         return false;
+
+   memset(env[idx].name, 0, ENV_NAME_MAXLEN);  
+   strncpy(env[idx].name,  name, min(strlen(name), ENV_NAME_MAXLEN));
+   memset(env[idx].value, 0, ENV_VALUE_MAXLEN);
+   strncpy(env[idx].value, value, min(strlen(value), ENV_VALUE_MAXLEN));
+   str_trim_end(env[idx].name);
+   str_trim_end(env[idx].value);
+   env[idx].used = true;
+
+   return true;
+}
+//------------------------------------------------------------------------------------------------------------------
 CmdStatus_e env_set_int(void* parent,const char* name, const char* value)
 {
     if (strlen(name) == 0 || strlen(value) == 0)
@@ -135,24 +159,16 @@ CmdStatus_e env_set_int(void* parent,const char* name, const char* value)
         idx = env_find_free_idx();
 
 
-    if (idx == -1)
+    if (!env_set(name, value))
     {
          getRootCommandHandler()->setResultMessage("too much env variables, unset some variable");
          return WRONG_PARAMS;
-    }   
-       
-   memset(env[idx].name, 0, ENV_NAME_MAXLEN);  
-   strncpy(env[idx].name,  name, min(strlen(name), ENV_NAME_MAXLEN));
-   memset(env[idx].value, 0, ENV_VALUE_MAXLEN);
-   strncpy(env[idx].value, value, min(strlen(value), ENV_VALUE_MAXLEN));
-   str_trim_end(env[idx].name);
-   str_trim_end(env[idx].value);
-   env[idx].used = true;
+    }       
 
    return OK;
 }
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e env_set(void* parent,int argc, char* argv[])
+CmdStatus_e env_set_cmd(void* parent,int argc, char* argv[])
 {
     char *ename = argv[2];
     char *eval = argv[3];
@@ -160,7 +176,7 @@ CmdStatus_e env_set(void* parent,int argc, char* argv[])
     return env_set_int(parent, ename, eval);
 }
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e env_unset(void* parent,int argc, char* argv[])
+CmdStatus_e env_unset_cmd(void* parent,int argc, char* argv[])
 {
     char *ename = argv[2];     
      
@@ -182,7 +198,7 @@ CmdStatus_e env_unset(void* parent,int argc, char* argv[])
    return OK;
 }
 //------------------------------------------------------------------------------------------------------------------
-char* env_get_direct(const char* name, char* defval)
+char* env_get(const char* name, char* defval)
 {
   int idx = env_find_idx_by_name(name);
   if (idx != -1)
@@ -211,7 +227,7 @@ CmdStatus_e env_get_int(void* parent,char* name)
    return OK;
 }
 //------------------------------------------------------------------------------------------------------------------
-CmdStatus_e env_get(void* parent,int argc, char* argv[])
+CmdStatus_e env_get_cmd(void* parent,int argc, char* argv[])
 {
     char *ename = argv[2];
         
@@ -219,7 +235,7 @@ CmdStatus_e env_get(void* parent,int argc, char* argv[])
 }
 //------------------------------------------------------------------------------------------------------------------
 #if USE_FILE_SYSTEM == 1
-CmdStatus_e env_save(void* parent,int argc, char* argv[])
+CmdStatus_e env_save_cmd(void* parent,int argc, char* argv[])
 {
      char path[32];
      sprintf(path, "%s", "/env.txt");     
@@ -247,7 +263,7 @@ CmdStatus_e env_save(void* parent,int argc, char* argv[])
 #endif
 //------------------------------------------------------------------------------------------------------------------
 #if USE_FILE_SYSTEM == 1
-CmdStatus_e env_load(void* parent,int argc, char* argv[])
+bool env_load(void)
 {
      char path[32];
      sprintf(path, "%s", "/env.txt");
@@ -258,7 +274,7 @@ CmdStatus_e env_load(void* parent,int argc, char* argv[])
      if (!f)
      {      
         getRootCommandHandler()->setHint("file /env.txt read failed!.");
-        return FILE_ERROR;      
+        return false;      
      }
      while (f.available())
      {      
@@ -276,11 +292,18 @@ CmdStatus_e env_load(void* parent,int argc, char* argv[])
         } else {
             getRootCommandHandler()->setHint("reading more items frin /env.txt failed!.");
             f.close();
-            return FILE_ERROR;   
+            return false;
         }
      }
 
-     f.close();
+     f.close();  
+     return true;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e env_load_cmd(void* parent,int argc, char* argv[])
+{
+     if (!env_load())
+         return FILE_ERROR;
      return OK;   
 }
 #endif

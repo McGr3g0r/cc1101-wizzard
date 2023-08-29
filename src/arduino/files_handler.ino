@@ -9,6 +9,7 @@ CmdStatus_e files_format(void* parent,int argc, char* argv[]);
 CmdStatus_e files_list(void* parent,int argc, char* argv[]);
 CmdStatus_e files_create(void* parent,int argc, char* argv[]);
 CmdStatus_e files_remove(void* parent,int argc, char* argv[]);
+CmdStatus_e files_rename(void* parent,int argc, char* argv[]);
 CmdStatus_e files_append(void* parent,int argc, char* argv[]);
 CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer, const char* openmode);
 CmdStatus_e files_write(void* parent,int argc, char* argv[]);
@@ -22,18 +23,19 @@ CmdStatus_e env_set_int(void* parent,const char* name, const char* value);
 LittleFSConfig cfg;
  char text[128];
 //------------------------------------------------------------------------------------------------------------------
-cmd_handler_t files_handler = { &files_main, NULL, NULL, "files", "Files utils, use: 'files help'", 0, "", "files help" };
+cmd_handler_t files_handler = { &files_main, NULL, NULL, "fs", "Files utils, use: 'fs help'", 0, "", "fs help" };
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t files_sub_cmd[] = {
-   { &files_main,    &files_handler,   NULL, "help",  "this help", 0, "", "files help"},
+   { &files_main,      &files_handler,   NULL, "help",  "this help", 0, "", "fs help"},
    { &files_format,    &files_handler,   NULL, "format",  "format LittleFS partition with pass code <aa55>", 1, "x", "files format aa55"},
-   { &files_list,    &files_handler,   NULL, "list",  "lists files in main folder", 0, "", "files list"},
-   { &files_create,    &files_handler,   NULL, "create",  "crate file: <filename>", 1, "t", "files create name.txt"},
-   { &files_remove,    &files_handler,   NULL, "remove",  "remove file: <filename> with pass code <aa55>", 2, "tx", "files remove name.txt aa55"},
-   { &files_write,    &files_handler,   NULL, "write",  "truncate file and write text line to file ", 2, "tt", "files write name.txt test2 test3 test4"},
-   { &files_append,    &files_handler,   NULL, "append",  "append text line to file ", 2, "tt", "files append name.txt test2 test3 test4"},
-   { &files_cat,    &files_handler,   NULL, "cat",  "concatenates file: <filename>", 1, "t", "files cat name.txt"},
-   { &files_readenv,    &files_handler,   NULL, "readenv",  "read file to env: <filename> to <envname>", 2, "tt", "files readenv name.txt env1"},
+   { &files_list,      &files_handler,   NULL, "ls",  "lists files in main folder", 0, "", "fs ls"},
+   { &files_create,    &files_handler,   NULL, "create",  "crate file: <filename>", 1, "t", "fs create name.txt"},
+   { &files_remove,    &files_handler,   NULL, "rm",  "remove file: <filename> with pass code <aa55>", 2, "tx", "fs rm name.txt aa55"},
+   { &files_rename,    &files_handler,   NULL, "mv",  "rename file: <filename1> <filename2> with pass code <aa55>", 3, "ttx", "fs mv name1.txt name2.txt aa55"},   
+   { &files_write,     &files_handler,   NULL, "write",  "truncate file and write text line to file ", 2, "tt", "fs write name.txt test2 test3 test4"},
+   { &files_append,    &files_handler,   NULL, "append",  "append text line to file ", 2, "tt", "fs append name.txt test2 test3 test4"},
+   { &files_cat,       &files_handler,   NULL, "cat",  "concatenates file: <filename>", 1, "t", "fs cat name.txt"},
+   { &files_readenv,   &files_handler,   NULL, "readenv",  "read file to env: <filename> to <envname>", 2, "tt", "fs readenv name.txt env1"},
    { 0,  0, NULL, "",  "", 0, "","" }
 };
 //------------------------------------------------------------------------------------------------------------------
@@ -162,6 +164,55 @@ CmdStatus_e files_remove(void* parent,int argc, char* argv[])
     }
 }
 //------------------------------------------------------------------------------------------------------------------
+CmdStatus_e files_rename(void* parent,int argc, char* argv[])
+{
+
+    char path1[FS_FILE_NAME_MAXLEN + 1];
+    char path2[FS_FILE_NAME_MAXLEN + 2];
+    
+    char *fname1 = argv[2];
+    char *fname2 = argv[3];
+    
+    int passcode =  strtoul(argv[4], 0, 16);
+
+    CmdHandler* handler = (CmdHandler*) parent;
+  
+    if (strlen(fname1) < 2 || strlen(fname1) > FS_FILE_NAME_MAXLEN)
+    {
+       handler->setHint("wrong file name 1 use dos-like file names");
+       return WRONG_PARAMS;
+    }
+
+    if (strlen(fname2) < 2 || strlen(fname2) > FS_FILE_NAME_MAXLEN)
+    {
+       handler->setHint("wrong file name 2 use dos-like file names");
+       return WRONG_PARAMS;
+    }
+
+    path_make_root(path2, fname2);
+        
+    if (LittleFS.exists(path2))
+    {
+       handler->setHint("destination file exists!.");
+       return WRONG_PARAMS;      
+    }
+
+    if (passcode != 0xaa55)
+    {
+       handler->setHint("wrong pass code");
+       return WRONG_PARAMS;
+    }
+
+    path_make_root(path1, fname1);
+    if (LittleFS.rename(path1, path2))
+    {
+         return OK;
+    } else {
+      handler->setHint("file rename failed!.");
+      return FILE_ERROR;
+    }
+}
+//------------------------------------------------------------------------------------------------------------------
 CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer, const char* openmode)
 {
     CmdHandler* handler = (CmdHandler*) parent;
@@ -190,6 +241,14 @@ CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer,
     }
 }
 //------------------------------------------------------------------------------------------------------------------
+int file_write(const char* path, const char* buffer, int len)
+{
+    if (files_write_int(getRootCommandHandler(), path, buffer, "w") == OK)
+        return len;
+    else
+        return 0;
+}
+//------------------------------------------------------------------------------------------------------------------
 CmdStatus_e files_write(void* parent,int argc, char* argv[])
 {
 
@@ -204,6 +263,14 @@ CmdStatus_e files_write(void* parent,int argc, char* argv[])
         
     return files_write_int(parent, fname, text, "w");
   
+}
+//------------------------------------------------------------------------------------------------------------------
+int file_append(const char* path, const char* buffer,  int len)
+{
+   if (files_write_int(getRootCommandHandler(), path, buffer, "a") == OK)
+      return len;
+   else
+      return 0;
 }
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e files_append(void* parent,int argc, char* argv[])
