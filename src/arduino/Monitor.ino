@@ -11,6 +11,10 @@
 #include "radio_pulses.h"
 #include "utils.h"
 //------------------------------------------------------------------------------------------------------------------
+#if USE_FILE_SYSTEM == 1
+#include "files.h"
+#endif
+//------------------------------------------------------------------------------------------------------------------
 CmdStatus_e monitor_main(void* parent,int argc, char* argv[]);
 CmdStatus_e monitor_start(void* parent,int argc, char* argv[]);
 CmdStatus_e monitor_protocols(void* parent,int argc, char* argv[]);
@@ -110,6 +114,9 @@ void monitor_process(int minPulseTime, int maxObsTime)
                  String s = protocols[idx]->describe(millis());
                  STDOUT.print(s);
                  STDOUT.print("\n\r");
+                 #if USE_FILE_SYSTEM == 1
+                 file_append("/monitor.txt", s.c_str(), s.length());
+                 #endif
              }
          }
      }

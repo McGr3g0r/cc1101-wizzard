@@ -4,11 +4,13 @@
 #include "Parser.h"
 #include "Script.h"
 #include "Terminal.h"
-#include "Processor.h"
 #include "CmdHandler.h"
 #include "settings.h"
 #include "radio_profile.h"
 #include "radio_pulses.h"
+#if USE_FILE_SYSTEM == 1
+#include "env.h"
+#endif
 //------------------------------------------------------------------------------------------------------------------
 #define CMD_MAX_BUFFER_LEN 80
 //------------------------------------------------------------------------------------------------------------------
@@ -16,7 +18,6 @@ CC1101 cc;
 Parser parser;
 Terminal term(CMD_MAX_BUFFER_LEN);
 CmdHandler handler;
-Processor proc;
 Script script;
 //------------------------------------------------------------------------------------------------------------------
 void radio_cmd_init(void);
@@ -27,7 +28,6 @@ void protocols_cmd_init(void);
 void env_cmd_init(void);
 #if USE_FILE_SYSTEM == 1
 void files_cmd_init(void);
-CmdStatus_e env_load(void* parent,int argc, char* argv[]);
 #endif
 //------------------------------------------------------------------------------------------------------------------
 CmdHandler* getRootCommandHandler(void)
@@ -51,11 +51,6 @@ void commands_init(void)
 CC1101* getRadio() 
 {
   return &cc;
-}
-//------------------------------------------------------------------------------------------------------------------
-Processor* getProc()
-{
-  return &proc;
 }
 //------------------------------------------------------------------------------------------------------------------
 void setup() {
@@ -90,7 +85,7 @@ void setup() {
      term.clear();
 
      #if USE_FILE_SYSTEM == 1
-     env_load(0, 0, 0);
+     env_load();
      script.load("/init.scr");
      #endif
      
@@ -129,6 +124,5 @@ void loop() {
             Serial.println("OK");
       }
   }
-  proc.process();
 }
 //------------------------------------------------------------------------------------------------------------------

@@ -12,7 +12,10 @@
 #include "utils.h"
 #if USE_FILE_SYSTEM == 1
 #include "LittleFS.h"
+#include "files.h"
 #endif
+//------------------------------------------------------------------------------------------------------------------
+#include "env.h"
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_main(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy(void* parent,int argc, char* argv[]);
@@ -28,9 +31,7 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_processr(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[]);
 CmdHandler* getRootCommandHandler(void);
-
-CmdStatus_e env_set_int(void* parent,const char* name, const char* value);
-
+//------------------------------------------------------------------------------------------------------------------
 CC1101* getRadio(void);
 #if USE_FILE_SYSTEM == 1
 CmdStatus_e files_write_int(void* parent, const char *fname, const char* buffer, const char* openmode);
@@ -326,9 +327,21 @@ CmdStatus_e open_sesame_somfy_processr(void* parent,int argc, char* argv[])
    somfy_ctx.rssi = rssi;
    somfy_ctx.rssi_wait_ms = wait_after_rssi;
 
-
    return open_sesame_somfy_process(parent, argc, argv);
 }    
+//------------------------------------------------------------------------------------------------------------------
+void open_sesame_somfy_store_counter(uint64_t val)
+{
+    char buf[20];
+    uint32_t h = (val >> 32) & 0xffffffff;
+    uint32_t l = (val & 0xffffffff);
+    sprintf(buf, "%08x %08x", (uint32_t)(h), (uint32_t)(l));
+    file_write("/os_somfy.txt", buf, strlen(buf));
+    sprintf(buf, "%08x", (uint32_t)(h));
+    env_set("sirsh", buf);
+    sprintf(buf, "%08x",(uint32_t)(l));
+    env_set("sirsl", buf);
+}
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
 {
@@ -338,10 +351,8 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
     uint32_t c0;
     uint32_t c1;
     uint32_t c2;
-    uint32_t h,l;
     int pulses;
     int p;
-    char buff[64];
     
     if (disp == 0 || disp < 2000 || disp > 360000)
     {
@@ -453,16 +464,7 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
        somfy_ctx.curr++;
        #if USE_FILE_SYSTEM == 1
        if (somfy_ctx.curr  > 0 && somfy_ctx.curr % OS_ITERATION_FILE_AUTO_DUMP == 0)
-       {
-            h = (somfy_ctx.curr  >> 32) & 0xffffffff;
-            l = (somfy_ctx.curr & 0xffffffff);
-            sprintf(buff, "%08x %08x", (uint32_t)(h), (uint32_t)(l));
-            files_write_int(parent, "/os_somfy.txt", buff, "w");
-            sprintf(buff, "%08x", (uint32_t)(h));
-            env_set_int(parent , "sirsh", buff);
-            sprintf(buff, "%08x", (uint32_t)(l));
-            env_set_int(parent , "sirsl", buff);      
-       }
+           open_sesame_somfy_store_counter(somfy_ctx.curr);
        #endif
       
        if (STDIN.available() > 0)
@@ -478,14 +480,7 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
     }
     #if USE_FILE_SYSTEM == 1
     //store last counter
-    h = (somfy_ctx.curr  >> 32) & 0xffffffff;
-    l = (somfy_ctx.curr & 0xffffffff);   
-    sprintf(buff, "%08x %08x", (uint32_t)(h), (uint32_t)(l));
-    files_write_int(parent, "/os_somfy.txt", buff, "w");
-    sprintf(buff, "%08x", (uint32_t)(h));
-    env_set_int(parent , "sirsh", buff);
-    sprintf(buff, "%08x", (uint32_t)(l));
-    env_set_int(parent , "sirsl", buff);   
+    open_sesame_somfy_store_counter(somfy_ctx.curr);
     #endif
     msg = "brut last tx:" + open_sesame_somfy_ctx_describe(c0,c1,c2,somfy_ctx, startMs);
     STDOUT.print(msg); STDOUT.print("\n\r");

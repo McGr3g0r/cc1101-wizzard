@@ -41,7 +41,7 @@ void Parser::apply_env(void)
          char* arg = argv[idx];
          memset(tmp, 0, sizeof(tmp));
          strcat(tmp, &arg[1]);
-         argv[idx] = env_get_direct(tmp, arg);
+         argv[idx] = env_get(tmp, arg);
       }
   }
 }
