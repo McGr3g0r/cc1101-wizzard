@@ -55,13 +55,14 @@ CC1101* getRadio()
 //------------------------------------------------------------------------------------------------------------------
 void setup() {
      String tmp;
+     String verStr = String("CC1101 Wizard tool v")+ String(FW_VER_HI) + String(".") + String(FW_VER_LO) + String(" connected, use 'help' for list of commands...\n\r");
      uint32_t s = millis();
      Serial.begin(115200);
 
      while (!Serial && millis() -s < 1000);
      delay(1000);
      
-     Serial.println(F("CC1101 Wizard tool connected, use 'help' for list of commands...\n\r"));
+     Serial.println(verStr.c_str());
      Serial.println(F("(C) Grzegorz Rajtar grzegorz.rajtar@gmail.com 2023\n\r"));
      Serial.print(F("Plarform:"));Serial.println(platform_get_name());
      Serial.println();

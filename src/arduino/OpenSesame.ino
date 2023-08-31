@@ -348,13 +348,20 @@ CmdStatus_e open_sesame_somfy_srssi(void* parent,int argc, char* argv[])
    return OK;
 }   
 //------------------------------------------------------------------------------------------------------------------
-void open_sesame_somfy_store_counter(uint64_t val)
+void open_sesame_somfy_store_file_counter(uint64_t val)
 {
     char buf[20];
     uint32_t h = (val >> 32) & 0xffffffff;
     uint32_t l = (val & 0xffffffff);
     sprintf(buf, "%08x %08x", (uint32_t)(h), (uint32_t)(l));
     file_write("/os_somfy.txt", buf, strlen(buf));
+}
+//------------------------------------------------------------------------------------------------------------------
+void open_sesame_somfy_store_env_counter(uint64_t val)
+{
+    char buf[20];
+    uint32_t h = (val >> 32) & 0xffffffff;
+    uint32_t l = (val & 0xffffffff);
     sprintf(buf, "%08x", (uint32_t)(h));
     env_set("sirsh", buf);
     sprintf(buf, "%08x",(uint32_t)(l));
@@ -482,14 +489,16 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
 
        somfy_ctx.curr++;
        #if USE_FILE_SYSTEM == 1
-       if (somfy_ctx.curr  > 0 && somfy_ctx.curr % OS_ITERATION_FILE_AUTO_DUMP == 0)
-           open_sesame_somfy_store_counter(somfy_ctx.curr);
+       if (somfy_ctx.curr  > 0) && somfy_ctx.curr % OS_ITERATION_FILE_AUTO_DUMP == 0)
+           open_sesame_somfy_store_env_counter(somfy_ctx.curr);
+       if (somfy_ctx.curr  > 0 && somfy_ctx.curr % (4 * OS_ITERATION_FILE_AUTO_DUMP) == 0)
+           open_sesame_somfy_store_file_counter(somfy_ctx.curr);
        #endif
 
        opsec = (millis() - startMs) / 1000;
 
        if (somfy_ctx.max_time > 0 && opsec > somfy_ctx.max_time)
-          cont = false;
+           cont = false;
           
        if (STDIN.available() > 0 && cont)
        {
@@ -504,7 +513,8 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
     }
     #if USE_FILE_SYSTEM == 1
     //store last counter
-    open_sesame_somfy_store_counter(somfy_ctx.curr);
+    open_sesame_somfy_store_env_counter(somfy_ctx.curr);
+    open_sesame_somfy_store_file_counter(somfy_ctx.curr);
     #endif
     msg = "brut last tx:" + open_sesame_somfy_ctx_describe(c0,c1,c2,somfy_ctx, startMs);
     STDOUT.print(msg); STDOUT.print("\n\r");
