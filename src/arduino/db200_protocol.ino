@@ -1,74 +1,82 @@
 //------------------------------------------------------------------------------------------------------------------
-#include "ev1527_protocol.h"
+#include "db200_protocol.h"
 //------------------------------------------------------------------------------------------------------------------
-#define EV1527_TIME_US 250
-#define EV1527_PROTO_BITS 24
-#define EV1527_PULSES_PER_BIT 2
-#define EV1527_GUARD_TIME_US 150
+#define DB200_TIME_US 333
+#define DB200_PROTO_BITS 4
+#define DB200_PULSES_PER_BIT 2
+#define DB200_GUARD_TIME_US 12000
 //------------------------------------------------------------------------------------------------------------------
-EV1527Protocol::EV1527Protocol()
+DB200Protocol::DB200Protocol()
 {
-    pulse_divisor = EV1527_TIME_US;
+    pulse_divisor = DB200_TIME_US;
 }
 //------------------------------------------------------------------------------------------------------------------
-String EV1527Protocol::getName(void)
+String DB200Protocol::getName(void)
 {
-    return "ev1527";  
+    return "db200";  
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getMinimalTime()
+int DB200Protocol::getMinimalTime()
 {
-    return (EV1527_TIME_US -(EV1527_TIME_US / 4));
+    return (DB200_TIME_US -(DB200_TIME_US / 4));
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getInterFrameTime()
+int DB200Protocol::getInterFrameTime()
 {
-    return 2000;
+    return 12280;
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getMaximalTime()
+int DB200Protocol::getMaximalTime()
 {
-   return 32 * EV1527_TIME_US;
+   return 35 * DB200_TIME_US;
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getFrameTime()
+int DB200Protocol::getFrameTime()
 {
-    return (32 + 4 * 32 + 4) * EV1527_TIME_US;
+    return (24 + 12 + 3) * DB200_TIME_US;
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::getMinPulses(void)
+int DB200Protocol::getMinPulses(void)
 {
-    return 50;
+    return 16+9;
 }
 //------------------------------------------------------------------------------------------------------------------
-bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
+bool DB200Protocol::fromPulses(int pulses, uint16_t* buffer)
 {
     int i;
     int length;
-    bool preambule = false;
+    int preambule = 0;
         
     int hist[4];
     int hist_idx[4];
         
-    if (pulses < (2 + (2* 24)))
+    if (pulses < (16 + (DB200_PROTO_BITS + DB200_PULSES_PER_BIT) + 2))
            return false; 
 
-    pulse_divisor = pulses_histogram(EV1527_TIME_US, buffer, pulses, pulse_hist, pulse_hist_idx, sizeof(pulse_hist_idx) / sizeof(int));
+    pulse_divisor = pulses_histogram(DB200_TIME_US, buffer, pulses, pulse_hist, pulse_hist_idx, sizeof(pulse_hist_idx) / sizeof(int));
+
+    //STDOUT.println("#dbg1");
         
     for (i=0; i<pulses-1; i++)
     {
         int t1 = pulseLen(buffer[i]);
         int t2 = pulseLen(buffer[i+1]);
       
-        if (t1 == 1 && (t2 >=30 && t2 <= 34))
+        if (t1 == 1 && t2 == 2)
         {
-           preambule = true;
-           i += 2;
-           break;
+           preambule++;
+           i++;
+           if (preambule == 8)
+           {
+               i++;
+               break;
+           }
         }
+         else
+             preambule = 0;
     }
 
-    if (!preambule) {
+    if (preambule != 8) {
         return false;   
     }
            
@@ -82,13 +90,16 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
     {
        int p0 = pulseLen(buffer[i]);
        int p1 = pulseLen(buffer[i+1]);
-       if (p0==3 && (p1==1 || (p1 >=1 && i+2 >= pulses - 1))) /* final pulse, artificially set to frame spacer*/
+       
+       //STDOUT.print(" i:");STDOUT.print(i);STDOUT.print(" p0:");STDOUT.print(p0);STDOUT.print(" p1:");STDOUT.println(p1);
+       
+       if (p0==1 && (p1==1 || (p1 >=1 && length == DB200_PROTO_BITS - 1))) /* final pulse, artificially set to frame spacer*/
        {
           length++;
           bits <<= 1;
           bits |= 1;
        }
-       else if (p0==1 && (p1==3 || (p1 >=3 && i+2 >=pulses - 1)))  /* final pulse, artificially set to frame spacer*/
+       else if (p0==2 && (p1==1 || (p1 >=2 && length == DB200_PROTO_BITS - 1)))  /* final pulse, artificially set to frame spacer*/
        {
           length++;
           bits <<= 1;
@@ -96,6 +107,13 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
        }
        else        
        {
+        /*
+        STDOUT.println("#dbg1122");
+        STDOUT.print(" length:");STDOUT.print(length);
+        STDOUT.print(" i:");STDOUT.print(i);
+        STDOUT.print(" p0:");STDOUT.print(p0);
+        STDOUT.print(" p1:");STDOUT.println(p1);*/
+        
           return false;
        }
 
@@ -111,7 +129,7 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
           buffer_fix = true;
        }    
       
-       if (length == EV1527_PROTO_BITS)
+       if (length == DB200_PROTO_BITS)
            break; 
     }
         
@@ -119,13 +137,13 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
     {
     
        int p0 = pulseLen(buffer[i]);
-       if (p0==3 /*&& p1==1*/)
+       if (p0==1 /*&& p1==1*/)
        {
           length++;
           bits <<= 1;
           bits |= 1;
        }
-       else if (p0==1 /*&& p1==3*/)
+       else if (p0==2 /*&& p1==1*/)
        {
           length++;
           bits <<= 1;
@@ -148,59 +166,67 @@ bool EV1527Protocol::fromPulses(int pulses, uint16_t* buffer)
         bytesAdd(bits);
     }
            
-    if (length < EV1527_PROTO_BITS)
+    if (length < DB200_PROTO_BITS)
        return false;
     else
        return true;
 }
 //------------------------------------------------------------------------------------------------------------------
-void EV1527Protocol::setData(uint32_t data, uint8_t btn)
+void DB200Protocol::setData(uint8_t data)
 {
     code = data;
-    this->btn = btn;  
 }
 //------------------------------------------------------------------------------------------------------------------
-int EV1527Protocol::dataToBytes(void)
+int DB200Protocol::dataToBytes(void)
 {
 
     bytesClear();
 
-    //code 20bit, btn  bits
-    bytesAdd(reverse8((code >> 16) & 0xff));
-    bytesAdd(reverse8((code >> 8)  & 0xff));
-    bytesAdd(reverse8((code & 0xf0) | (btn & 0x0f)));
+    //code 7bit  bits
+    bytesAdd(/*reverse8*/(code  & 0x0f));
 
     //24bits in protocol
-    return EV1527_PROTO_BITS;
+    return DB200_PROTO_BITS;
 }
 //------------------------------------------------------------------------------------------------------------------
-bool EV1527Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo)
+bool DB200Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int frameNo)
 {
     int pls = 0;
 
     int length = dataToBytes();
   
-    if (maxPulses < (2 + (24 * EV1527_PULSES_PER_BIT)))
+    if (maxPulses < (16 + (4 * DB200_PULSES_PER_BIT) + 3))
        return false;
 
-    buffer[pls++] = pulseDuration(1);
-    buffer[pls++] = pulseDuration(31);
-       
+    for (int i = 0; i < 8; i++)
+    {
+      buffer[pls++] = pulseDuration(1);
+      buffer[pls++] = pulseDuration(2);
+    }
+      
     for (int i=0; i<length; i++)
     {
          int bit = (bytes[i/8] >> (i&7)) & 1;
          if (bit)
          {
-            buffer[pls++] = pulseDuration(3);
+            buffer[pls++] = pulseDuration(1);
             buffer[pls++] = pulseDuration(1);
          } else
          {
+            buffer[pls++] = pulseDuration(2);//!!! was 3
             buffer[pls++] = pulseDuration(1);
-            buffer[pls++] = pulseDuration(3);
          }
     }
 
-    buffer[pls - 1] += EV1527_GUARD_TIME_US;
+    if ((pls & 0x01) == 0x00)
+        buffer[pls-1] +=pulseDuration(1);
+    else
+        buffer[pls++] = pulseDuration(1);
+        
+    buffer[pls++] = pulseDuration(1);
+    buffer[pls++] = pulseDuration(1);
+
+    buffer[pls - 1] += DB200_GUARD_TIME_US;
 
     *pulses = pls;
 
@@ -208,16 +234,15 @@ bool EV1527Protocol::toPulses(uint16_t* buffer, int maxPulses,int* pulses, int f
     return true;
 }
 //------------------------------------------------------------------------------------------------------------------
-String EV1527Protocol::describe(uint32_t ts)
+String DB200Protocol::describe(uint32_t ts)
 {
       char buffer[64];
       int len = bits; // count of bits
       
-      code = (uint32_t)((bytes[0] << 16) | (bytes[1] << 8) | bytes[2]);
-      btn = (bytes[2] & 0x0f);
+      code = (uint32_t)(bytes[0]);
 
-      sprintf(buffer, "{ \"prot\":\"%s\", \"code\":\"%05x\", \"btn\": %d, \"ts\": %d  }",
-          getName().c_str(), code, btn, ts);
+      sprintf(buffer, "{ \"prot\":\"%s\", \"code\":\"%01x\", \"ts\": %d  }",
+          getName().c_str(), code, ts);
       return buffer;
 }
 //------------------------------------------------------------------------------------------------------------------

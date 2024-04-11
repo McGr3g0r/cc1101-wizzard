@@ -69,7 +69,10 @@ bool SomfyRTSProtocol::fromPulses(int pulses, uint16_t* buffer)
         //12 pulses Preamble, 1 pulse soft sync, 166 halfbits       
       
         if (pulses < SOMFY_FRAME_PULSES)
+        {
+           //STDOUT.print("dbg#1");
            return false;
+        }
         
         for (i=0; i< pulses; i++)
         {
@@ -91,13 +94,20 @@ bool SomfyRTSProtocol::fromPulses(int pulses, uint16_t* buffer)
         
 
         if (preambule < 12 && preambule < 24) // should be 24 or 12 for repeated frame
+        {
+            //STDOUT.print("dbg#2");STDOUT.print("pr:");STDOUT.println(preambule);
             return false;
+        }
                      
         //should be SOFT_SYNC_PULSES --> 4800us
-        if (buffer[i] >= SOFT_SYNC_US-(HALF_TIME_CLOCK/2) && buffer[i] <= SOFT_SYNC_US+(HALF_TIME_CLOCK/2)) {
+        if (buffer[i] >= SOFT_SYNC_US-(HALF_TIME_CLOCK/2) && buffer[i] <= SOFT_SYNC_US+(HALF_TIME_CLOCK/2)+(HALF_TIME_CLOCK/10)) {
             i++;
-        }
+        }        
         else {
+              /*STDOUT.println("dbg#3");
+              STDOUT.print(" p:");STDOUT.print(pulses);
+              STDOUT.print(" i:");STDOUT.print(i);
+              STDOUT.print(" l:");STDOUT.println(buffer[i]);*/
               return false;
         }
             
@@ -105,7 +115,7 @@ bool SomfyRTSProtocol::fromPulses(int pulses, uint16_t* buffer)
         int bits = 0;
         
         bytesClear();
-        
+        //STDOUT.print("dbg#31");
         for (; i< pulses - 1; i+=2)
         {
            //Manchester encoding 
@@ -133,6 +143,7 @@ bool SomfyRTSProtocol::fromPulses(int pulses, uint16_t* buffer)
            }
            else        
            {
+             //STDOUT.print("dbg#4");
               return false;
            }
 
@@ -152,11 +163,30 @@ bool SomfyRTSProtocol::fromPulses(int pulses, uint16_t* buffer)
         {
              bytesAdd(bits);
         }
-        
+
+        if (length == SOMFY_CODED_BITS - 1)
+        {
+              length++;
+              bits <<= 1;
+              bits |= 1;
+                      
+              if ((length & 7) != 0)
+              {
+                   bytesAdd(bits);
+              }
+        }
         if (length < SOMFY_CODED_BITS)
+        {
+          //STDOUT.print("dbg#5");
+          //STDOUT.print("l:");STDOUT.println(length);
            return false;
+        }
         else
+        {
+          //STDOUT.print("dbg#6");
+          //STDOUT.print("l:");STDOUT.println(length);
            return true;
+        }
 }
 //------------------------------------------------------------------------------------------------------------------
 int SomfyRTSProtocol::dataToBytes(void)

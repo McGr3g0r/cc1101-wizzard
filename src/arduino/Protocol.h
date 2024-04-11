@@ -21,7 +21,7 @@ class Protocol
         int pulse_hist[10];
         int pulse_hist_idx[10];
         int pulse_divisor = 0;
-        uint8_t bytes[16];
+        uint8_t bytes[32];
         int bytes_idx;
         int bits;
 

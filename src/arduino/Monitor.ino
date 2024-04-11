@@ -5,6 +5,10 @@
 #include "ev1527_protocol.h"
 #include "hcs200_protocol.h"
 #include "somfy_protocol.h"
+#include "db200_protocol.h"
+#include "pt2240_protocol.h"
+#include "tesla_um2_protocol.h"
+#include "retekess_protocol.h"
 //------------------------------------------------------------------------------------------------------------------
 #include "CmdHandler.h"
 #include "radio_profile.h"
@@ -24,7 +28,11 @@ CC1101* getRadio(void);
 EV1527Protocol ev1527;
 HCS200Protocol hcs200;
 SomfyRTSProtocol somfy;
-Protocol* protocols[] = { &ev1527, &hcs200, &somfy };
+DB200Protocol db200;
+PT2240Protocol pt2240;
+TeslaUM2Protocol tum2;
+RetekessProtocol retk;
+Protocol* protocols[] = { &ev1527, &hcs200, &somfy, &db200, &pt2240, &retk};
 //------------------------------------------------------------------------------------------------------------------
 #define CTRL_C 0x03
 #define CTRL_F 0x06
@@ -83,7 +91,7 @@ int monitor_get_maximal_time(void)
     int res = 0;
     for (int idx = 0 ; idx < sizeof(protocols) / sizeof(Protocol*); idx++)
     {
-         int v = protocols[idx]->getMinimalTime();
+         int v = protocols[idx]->getMaximalTime();
          if (idx == 0 || res < v)
             res = v;          
     }
@@ -96,13 +104,16 @@ int monitor_protocols_get_count(void)
 {
    return sizeof(protocols) / sizeof(Protocol*);
 }
-void monitor_process(int minPulseTime, int maxObsTime)
+void monitor_process(int minPulseTime, int maxObsTime, int noClean)
 {
-     if (maxObsTime < 2000000)
-         maxObsTime = 2000000;
-         
-     radio_pulses_flush();
-     radio_pulses_grab(STDIN, 0, minPulseTime, maxObsTime);
+     if (maxObsTime < 100000)
+         maxObsTime = 100000;
+
+     if (!noClean)
+     {
+         radio_pulses_flush();
+         radio_pulses_grab(STDIN, 0, minPulseTime, maxObsTime);
+     }
 
      for (int idx = 0 ; idx < sizeof(protocols) / sizeof(Protocol*); idx++)
      {
@@ -128,6 +139,7 @@ CmdStatus_e monitor_start(void* parent,int argc, char* argv[])
 
     int minTime    = monitor_get_minimal_time();
     int maxObsTime = monitor_get_maximal_time();
+    int no_clean = 0;
 
     if (monitor_protocols_get_count() == 0)
     {
@@ -135,9 +147,23 @@ CmdStatus_e monitor_start(void* parent,int argc, char* argv[])
        return OK;
     }
 
+    if (argc == 3)
+    {
+       no_clean = strtoul(argv[2], 0, 10); 
+    }
+
+
+    #if USE_FILE_SYSTEM == 1
+    String msg = "monitor start ...";
+    file_append("/monitor.txt", msg.c_str(), msg.length()); 
+    #endif    
+
     STDOUT.print("monitor freq: ");
     STDOUT.print(getRadio()->getFreq());
-    STDOUT.println(" Khz, press ctrl-c/f/d to terminate...");
+    STDOUT.print(" Khz");
+    STDOUT.print(", noc:");
+    STDOUT.print(no_clean);
+    STDOUT.println(" ,press ctrl-c/f/d to terminate...");
     while(cont)
     { 
       if (STDIN.available() > 0)
@@ -150,7 +176,8 @@ CmdStatus_e monitor_start(void* parent,int argc, char* argv[])
              continue;
          }
       }
-      monitor_process(minTime, maxObsTime);
+      monitor_process(minTime, maxObsTime, no_clean);
+      no_clean = 0;
       
     }
     STDOUT.println("monitor done...");

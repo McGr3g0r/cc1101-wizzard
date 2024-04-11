@@ -74,6 +74,30 @@ bool isHex(char* str)
 
    return true;
 }
+
+uint8_t hexc_to_u8(char c)
+{
+   uint8_t res = 0;
+   if (c >= '0' || c <= '9')
+       res = c - '0';
+   else if (c >= 'a' || c <= 'f')
+       res = c - 'a';       
+   else if (c >= 'A' || c <= 'F')
+       res = c - 'A'; 
+   return res;
+}
+//------------------------------------------------------------------------------------------------------------------
+uint8_t hex_to_u8(char* str, int len)
+{
+   uint8_t res = 0;
+   if (len == 2)
+   {
+       res = (hexc_to_u8(str[0]) << 4) | hexc_to_u8(str[1]);
+   } else {
+     res = hexc_to_u8(str[0]);
+   }
+   return res;
+}
 //------------------------------------------------------------------------------------------------------------------
 bool isBool(char* str)
 {
@@ -189,6 +213,38 @@ void apply_value_to_bitmask(uint32_t* b0, uint32_t* b1, uint32_t* b2, uint32_t m
     *b0 = uint32_read_buffer(&b[8], 0);
 }
 //------------------------------------------------------------------------------------------------------------------
+void apply_value_to_bitmask_32(uint32_t* b0, uint32_t msk0, uint32_t value)
+{
+   uint8_t msk[4];
+   uint8_t b[4];
+
+   uint32_write_buffer(&msk[0], 0, msk0);
+   
+   uint32_write_buffer(&b[0], 0, *b0);
+         
+   for (int pos = 0; pos < 32; pos++)
+   {
+      uint8_t bitVal = (value >> pos) & 0x01;
+      int mskOneCnt = 0;
+      for (int bitMskPos = 0; bitMskPos < 32; bitMskPos++)
+      {
+          int bytePos = bitMskPos >> 3;
+          int bitPos =  bitMskPos & 0x07;
+          uint8_t mskBit =  (msk[bytePos] >> bitPos) & 0x01;
+          if (mskBit)
+              mskOneCnt++;
+
+          if (mskOneCnt == pos && mskBit)
+          {
+              b[bytePos] &= ~(0x01   << bitPos);
+              b[bytePos] |=  (bitVal << bitPos);
+          }
+      }
+      
+   }
+   *b0 = uint32_read_buffer(&b[0], 0);
+}
+//------------------------------------------------------------------------------------------------------------------
 String millis_to_time(uint32_t ms)
 {
     uint32_t rest = ms;
@@ -234,7 +290,20 @@ uint64_t bitscount_to_max_uint64(int cnt)
     }
     return res;
 }  
-
+//------------------------------------------------------------------------------------------------------------------
+uint32_t bitscount_to_max_uint32(int cnt)
+{
+    uint32_t res = 0;
+    for (int pos = 0; pos < 32; pos++)
+    {
+       if (cnt)
+          res |= (1 << pos);
+       cnt--;
+       if (cnt == 0)
+           break;
+    }
+    return res;
+}  
 //------------------------------------------------------------------------------------------------------------------
 uint64_t bit_spread_assymetric(uint64_t val ,int bitsCount)
 {

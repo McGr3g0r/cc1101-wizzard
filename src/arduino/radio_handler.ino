@@ -2,6 +2,7 @@
 #include "CmdHandler.h"
 #include "radio_profile.h"
 #include "radio_pulses.h"
+#include "radio_raw.h"
 #include "utils.h"
 //------------------------------------------------------------------------------------------------------------------
 CmdStatus_e radio_main(void* parent,int argc, char* argv[]);
@@ -41,6 +42,7 @@ CmdStatus_e radio_pulses_play(void* parent,int argc, char* argv[]);
 CmdStatus_e radio_pulses_set(void* parent,int argc, char* argv[]);
 CmdStatus_e radio_pulses_add(void* parent,int argc, char* argv[]);
 CmdStatus_e radio_jammer(void* parent,int argc, char* argv[]);
+CmdStatus_e radio_send_data(void* parent,int argc, char* argv[]);
 //------------------------------------------------------------------------------------------------------------------
 CmdHandler* getRootCommandHandler(void);
 CC1101* getRadio(void);
@@ -93,6 +95,7 @@ cmd_handler_t radio_sub_cmd[] = {
    { &radio_pulses_add,     &radio_handler,  NULL, "pula", "add pulses <pulses> .." , 1, "i","radio pula 0<int> 20<int> ..." },
    { &radio_pulses_addoff,  &radio_handler,  NULL, "puao", "add pulses <offset> <pulses> ..." , 2, "ii","radio puao 0<int> 20<int> ..." },
    { &radio_jammer,         &radio_handler,  NULL, "jam",  "jam current channel <time millis> 0 - until ctrl-c" , 1, "i","radio jam 0<int>" },
+   { &radio_send_data,      &radio_handler,  NULL, "sda",  "send data packet", 1, "x","radio sda 234234addd444fff<hex_str>" },
 
       
    { 0,  0, NULL, "",  "", 0, "","" }
@@ -723,6 +726,25 @@ CmdStatus_e radio_pulses_add(void* parent,int argc, char* argv[])
        else
            return CmdStatus_e::WRONG_PARAMS;
    }
+       
+   return CmdStatus_e::OK;
+}
+//------------------------------------------------------------------------------------------------------------------
+
+CmdStatus_e radio_send_data(void* parent,int argc, char* argv[])
+{
+   if (argc < 2)
+       return CmdStatus_e::WRONG_PARAMS;
+   if (!isHex(argv[2]))
+       return CmdStatus_e::WRONG_PARAMS;     
+
+
+
+   radio_raw_init();
+   
+   radio_raw_add_hex(argv[2]);
+   
+   radio_raw_send(0, radio_raw_get_data_len());
        
    return CmdStatus_e::OK;
 }
