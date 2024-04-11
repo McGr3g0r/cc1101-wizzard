@@ -24,6 +24,8 @@ monitor freq: 433920 Khz, press ctrl-c...
 { "prot":"ev1527", "code":"aa331", "btn": 1, "ts": 400352  }
 
 { "prot":"hcs200", "code":"54xx51xd", "serial":"x1bx4xd", "btn": 0002, "battery_low": "false", "rpt": "false", "ts": 403683  }
+
+{ "prot":"Somfy RTS Keytis", "code0":"09878bf0", "code1":"54f57f59", "code2":"ffea8000", "ts": 45499  }
 ```
 
 Supported commands:
@@ -79,10 +81,27 @@ Monitoring protocol utility, use: 'monitor help'
 - start : starts monitoring, stops with ctrl-c
 - prot : list registered protocols
 ```
+
+protocols
+```
+send data with known protocols, use: 'protocol help'
+- help : this help
+- list : list registered protocols
+- somfy : send somfy rts frame
+- ev1527 : send ev1527 frame
+- hcs200 : send hcs200 frame
+- db200 : send db200 frame
+- pt2240 : send pt2240 frame
+- tesla_um2 : send tesla_um2 frame
+- retekess : send retekess frame
+```
+
 opensesame
 ```
 - prot : list registered protocols
 - somfy : somfy iterated frames flood
+- retekess : retekes iterated id flood
+- hcs200 : hcs200 iterated enccode flood
 ```
 
 files
@@ -128,5 +147,23 @@ files append somfy.scr opensesame somfy brutc 5000 -50 2000
 The script will perform opensesame on somfy protocol with given parameters and will read the last bit counter from os_somfy.txt 
 If the user interrupts the opensesame command with ctrl-c it will be possible to continue it later with last bit couter.
 
+
+Not every protocols need to be bruteforced. For example over a course of few weeks working on the Somfy RTS procol I have
+discovered that for this particular protol you need to catch just one remote code to generate few next codes. I did record
+many consecutives codes from the same remote and button press then observed a relation between consecutive codes. This method works 
+everytime until the remote flips and changes the second code, but then works again over a long sequence of codes.
+
+Example: after receiving the code in the monitor:
+```
+{ "prot":"Somfy RTS Keytis", "code0":"09878bf0", "code1":"54f57f59", "code2":"ffea8000", "ts": 45499  }
+
+```
+issue a command to send code (first parameter is how many codes ahead 1-6, second: frame repetitions, usually 6 to make sure the gate receiver gets the signal) :
+```
+opensesame somfy scod 09878bf0 54f57f59 ffea8000
+opensesame somfy nkey 1 6
+```
+
+Dont be evil.
 
 If you like my work and like to support me ;) --> [Paypal](https://www.paypal.com/donate/?business=CE4764JYLBHK6&no_recurring=0&currency_code=USD).
